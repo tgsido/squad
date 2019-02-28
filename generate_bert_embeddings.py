@@ -279,8 +279,6 @@ def main():
             examples.append(
                 InputExample(unique_id=id, text_a=padded_context, text_b=padded_question))
             count += 1
-            if(count == 4):
-                break
         return examples
 
 
