@@ -95,7 +95,7 @@ def main(args):
         log.info('Starting epoch {}...'.format(epoch))
         with torch.enable_grad(), \
                 tqdm(total=len(train_loader.dataset)) as progress_bar:
-            for contexts, questions, cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in train_loader:
+            for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in train_loader:
 
                 # Setup for forward
                 cw_idxs = cw_idxs.to(device)
@@ -104,13 +104,9 @@ def main(args):
                 optimizer.zero_grad()
 
                 ## Additions for BERT ##
-                bert_dev_embeddings = get_embeddings("dev", ids)
-                bert_test_embeddings = get_embeddings("test", ids)
+                print("batch_size: ", batch_size)
                 bert_train_embeddings = get_embeddings("train", ids)
-
                 print("bert_train_embeddings.size() ", bert_train_embeddings.size())
-                print("bert_dev_embeddings.size() ", bert_dev_embeddings.size())
-                print("bert_test_embeddings.size() ", bert_test_embeddings.size())
 
                 # Forward
                 log_p1, log_p2 = model(cw_idxs, qw_idxs)
@@ -175,7 +171,7 @@ def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2):
         gold_dict = json_load(fh)
     with torch.no_grad(), \
             tqdm(total=len(data_loader.dataset)) as progress_bar:
-        for contexts, questions, cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in data_loader:
+        for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in data_loader:
 
             # Setup for forward
             cw_idxs = cw_idxs.to(device)
