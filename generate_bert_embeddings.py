@@ -32,8 +32,8 @@ from pytorch_pretrained_bert.tokenization import BertTokenizer
 from pytorch_pretrained_bert.modeling import BertModel
 ## Additions ##
 from util import collate_fn, SQuAD
-MAX_CONTEXT_LEN = 400
-MAX_QUESTION_LEN = 50
+MAX_CONTEXT_LEN = 350
+MAX_QUESTION_LEN = 35
 MAX_SEQ_LENGTH = MAX_CONTEXT_LEN + MAX_QUESTION_LEN
 
 logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
@@ -44,6 +44,8 @@ logger = logging.getLogger(__name__)
 
 def get_embeddings(data_type, ids):
     ids = ids.tolist()
+    print("ids: ", ids)
+    print("len(ids): ", len(ids))
     ## SET DEVICE
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     n_gpu = torch.cuda.device_count()
@@ -81,13 +83,17 @@ def get_embeddings(data_type, ids):
     ## GET ALL EXAMPLES ##
     examples = []
     count = 0
+
+    print("dataset ids len: ", len(dataset))
     for context, question, cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, id in dataset:
+        #print("count: ", count, " id ", id)
         if (id in ids):
+            #print("found id in ids: ", id)
             padded_context = padString(context,MAX_CONTEXT_LEN)
             padded_question = padString(question,MAX_QUESTION_LEN)
             examples.append(
                 InputExample(unique_id=id, text_a=padded_context, text_b=padded_question))
-            count += 1
+        count += 1
 
     numExamples = len(examples)
     print("numExamples: ", numExamples, " in ", data_type, " dataset")
