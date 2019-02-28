@@ -75,6 +75,7 @@ class SQuAD(data.Dataset):
                            if use_v2 or self.y1s[idx].item() >= 0]
 
     def __getitem__(self, idx):
+        #print("idx: ", idx, " self.valid_idxs[idx] ", self.valid_idxs[idx])
         idx = self.valid_idxs[idx]
         ## additions for context and question ##
         example = (
@@ -87,6 +88,10 @@ class SQuAD(data.Dataset):
                    self.y1s[idx],
                    self.y2s[idx],
                    self.ids[idx])
+        #print("len(self.valid_idxs): ", len(self.valid_idxs))
+        #print("len(self.ids): ", len(self.ids))
+        #print("self.valid_idxs: ", self.valid_idxs)
+        #print("self.ids: ", self.ids)
 
         return example
 
@@ -133,7 +138,7 @@ def collate_fn(examples):
         return padded
 
     # Group by tensor type
-    context_idxs, context_char_idxs, \
+    contexts, questions, context_idxs, context_char_idxs, \
         question_idxs, question_char_idxs, \
         y1s, y2s, ids = zip(*examples)
 
