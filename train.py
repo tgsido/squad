@@ -53,9 +53,16 @@ def main(args):
     print("bert_dev_embeddings.size() ", bert_dev_embeddings.size())
     print("bert_test_embeddings.size() ", bert_test_embeddings.size())
 
+    print("saving all embeddings to disk")
+    torch.save(bert_train_embeddings, 'bert_train_embeddings.pt')
+    torch.save(bert_dev_embeddings, 'bert_dev_embeddings.pt')
+    torch.save(bert_test_embeddings, 'bert_test_embeddings.pt')
+    print("done saving embeddings")
+    """
     print("bert_train_embeddings ", bert_train_embeddings)
     print("bert_dev_embeddings ", bert_dev_embeddings)
     print("bert_test_embeddings ", bert_test_embeddings)
+    """
 
     return
 
