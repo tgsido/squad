@@ -199,6 +199,7 @@ def main():
     parser = argparse.ArgumentParser()
 
     ## Required parameters
+    parser.add_argument("--data_type", default="train", type=str, required=True)
     """
     parser.add_argument("--input_file", default=None, type=str, required=True)
     parser.add_argument("--output_file", default=None, type=str, required=True)
@@ -257,6 +258,18 @@ def main():
             return str
 
         train_record_file = './data/train.npz'
+
+        record_file = None
+        if(args.data_type == 'train'):
+            record_file = './data/train.npz'
+        elif(args.data_type == 'test'):
+            record_file = './data/test.npz'
+        elif(args.data_type == 'dev'):
+            record_file = './data/dev.npz'
+        else:
+            println("error - did not specify, train,test,or dev")
+            return
+
         use_squad_v2 = True
         train_dataset = SQuAD(train_record_file, use_squad_v2)
         count = 0
@@ -266,11 +279,14 @@ def main():
             examples.append(
                 InputExample(unique_id=id, text_a=padded_context, text_b=padded_question))
             count += 1
+            if(count == 4):
+                break
         return examples
 
 
     examples = getExamples()
-    print("numExamples: ", len(examples))
+    numExamples = len(examples)
+    print("numExamples: ", numExamples, " in ", args.data_type, " dataset")
 
     features = convert_examples_to_features(
         examples=examples, seq_length=MAX_SEQ_LENGTH, tokenizer=tokenizer)
@@ -300,11 +316,11 @@ def main():
     eval_dataloader = DataLoader(eval_data, sampler=eval_sampler, batch_size=1)
 
     model.eval()
-    output_file = "generated_train_bert_embeddings"
+    output_file = "generated_" + args.data_type + "_bert_embeddings"
     all_output_json = collections.OrderedDict()
     with open(output_file, "w", encoding='utf-8') as writer:
         for input_ids, input_mask, example_index in eval_dataloader:
-            print("example_index: ", example_index)
+            print("progess: ", example_index.item(), " / ", (numExamples-1))
             input_ids = input_ids.to(device)
             input_mask = input_mask.to(device)
 
@@ -323,12 +339,18 @@ def main():
                 embedding_entry["index"] = i
                 embedding_entry["token"] = token
                 embedding_entry["vector"] = encoder_layers[i].tolist()
+                """
+                if token == "PA" or token == "##D":
+                    embedding_entry["vector"] = torch.zeros(768).tolist()
+                else:
+                    embedding_entry["vector"] = encoder_layers[i].tolist()
+                """
                 all_embedding_entries.append(embedding_entry)
             output_json["embedding_entries"] = all_embedding_entries
 
-            all_output_json["train_" + str(unique_id)] = output_json
+            all_output_json[args.data_type + "_" + str(unique_id)] = output_json
         writer.write(json.dumps(all_output_json) + "\n")
-        print("all done generating embeddings")
+        print("all done generating embeddings for ", args.data_type)
 
 if __name__ == "__main__":
     main()
