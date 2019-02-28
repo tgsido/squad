@@ -30,7 +30,6 @@ from torch.utils.data.distributed import DistributedSampler
 
 from pytorch_pretrained_bert.tokenization import BertTokenizer
 from pytorch_pretrained_bert.modeling import BertModel
-
 ## Additions ##
 from util import collate_fn, SQuAD
 MAX_CONTEXT_LEN = 400
@@ -199,7 +198,7 @@ def main():
     parser = argparse.ArgumentParser()
 
     ## Required parameters
-    parser.add_argument("--data_type", default="train", type=str, required=True)
+    parser.add_argument("--data_type", default="None", type=str, required=True)
     """
     parser.add_argument("--input_file", default=None, type=str, required=True)
     parser.add_argument("--output_file", default=None, type=str, required=True)
@@ -257,9 +256,9 @@ def main():
             #print("numWords AFTER: ", numWords)
             return str
 
-        train_record_file = './data/train.npz'
-
+        
         record_file = None
+        print("user specified ",args.data_type)
         if(args.data_type == 'train'):
             record_file = './data/train.npz'
         elif(args.data_type == 'test'):
@@ -271,7 +270,7 @@ def main():
             return
 
         use_squad_v2 = True
-        train_dataset = SQuAD(train_record_file, use_squad_v2)
+        train_dataset = SQuAD(record_file, use_squad_v2)
         count = 0
         for context, question, cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, id in train_dataset:
             padded_context = padString(context,MAX_CONTEXT_LEN)
