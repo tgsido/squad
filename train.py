@@ -95,7 +95,7 @@ def main(args):
         log.info('Starting epoch {}...'.format(epoch))
         with torch.enable_grad(), \
                 tqdm(total=len(train_loader.dataset)) as progress_bar:
-            for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in train_loader:
+            for contexts, questions, cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in train_loader:
 
                 # Setup for forward
                 cw_idxs = cw_idxs.to(device)
@@ -175,7 +175,7 @@ def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2):
         gold_dict = json_load(fh)
     with torch.no_grad(), \
             tqdm(total=len(data_loader.dataset)) as progress_bar:
-        for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in data_loader:
+        for contexts, questions, cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in data_loader:
 
             # Setup for forward
             cw_idxs = cw_idxs.to(device)
