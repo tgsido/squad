@@ -45,9 +45,9 @@ def main(args):
     word_vectors = util.torch_from_json(args.word_emb_file)
 
     ## Addition to get BERT embeddings ##
-    bert_train_embeddings = get_embeddings("train")
     bert_dev_embeddings = get_embeddings("dev")
     bert_test_embeddings = get_embeddings("test")
+    bert_train_embeddings = get_embeddings("train")
 
     print("bert_train_embeddings.size() ", bert_train_embeddings.size())
     print("bert_dev_embeddings.size() ", bert_dev_embeddings.size())
