@@ -51,6 +51,9 @@ class SQuAD(data.Dataset):
         self.question_char_idxs = torch.from_numpy(dataset['ques_char_idxs']).long()
         self.y1s = torch.from_numpy(dataset['y1s']).long()
         self.y2s = torch.from_numpy(dataset['y2s']).long()
+        ## Additions for contexts and questions ##
+        self.contexts = dataset['contexts']
+        self.questions = dataset['questions']
 
         if use_v2:
             # SQuAD 2.0: Use index 0 for no-answer token (token 1 = OOV)
@@ -73,7 +76,11 @@ class SQuAD(data.Dataset):
 
     def __getitem__(self, idx):
         idx = self.valid_idxs[idx]
-        example = (self.context_idxs[idx],
+        ## additions for context and question ##
+        example = (
+                   self.contexts[idx],
+                   self.questions[idx],
+                   self.context_idxs[idx],
                    self.context_char_idxs[idx],
                    self.question_idxs[idx],
                    self.question_char_idxs[idx],
@@ -85,6 +92,7 @@ class SQuAD(data.Dataset):
 
     def __len__(self):
         return len(self.valid_idxs)
+
 
 
 def collate_fn(examples):

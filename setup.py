@@ -24,6 +24,9 @@ from subprocess import run
 from tqdm import tqdm
 from zipfile import ZipFile
 
+## addition to write dictionary to memory ##
+import pickle
+
 
 def download_url(url, output_path, show_progress=True):
     class DownloadProgressBar(tqdm):
@@ -131,6 +134,7 @@ def process_file(filename, data_type, word_counter, char_counter):
                         y1, y2 = answer_span[0], answer_span[-1]
                         y1s.append(y1)
                         y2s.append(y2)
+                    """
                     example = {"context_tokens": context_tokens,
                                "context_chars": context_chars,
                                "ques_tokens": ques_tokens,
@@ -138,6 +142,18 @@ def process_file(filename, data_type, word_counter, char_counter):
                                "y1s": y1s,
                                "y2s": y2s,
                                "id": total}
+                    """
+                    example = {
+                               "context": context,
+                               "question": ques,
+                               "context_tokens": context_tokens,
+                               "context_chars": context_chars,
+                               "ques_tokens": ques_tokens,
+                               "ques_chars": ques_chars,
+                               "y1s": y1s,
+                               "y2s": y2s,
+                               "id": total
+                               }
                     examples.append(example)
                     eval_examples[str(total)] = {"context": context,
                                                  "question": ques,
@@ -176,12 +192,23 @@ def get_embedding(counter, data_type, limit=-1, emb_file=None, vec_size=None, nu
     token2idx_dict = {token: idx for idx, token in enumerate(embedding_dict.keys(), 2)}
     token2idx_dict[NULL] = 0
     token2idx_dict[OOV] = 1
+
+    ## addition for idx2token_dict ##
+    idx2token_dict = {token2idx_dict[token]: token for token in token2idx_dict}
+    if data_type == 'word':
+        pickle_filename = "idx2word_dict.pickle"
+    else:
+        pickle_filename = "idx2char_dict.pickle"
+    pickle_out = open(pickle_filename,"wb")
+    pickle.dump(idx2token_dict, pickle_out)
+    pickle_out.close()
+
     embedding_dict[NULL] = [0. for _ in range(vec_size)]
     embedding_dict[OOV] = [0. for _ in range(vec_size)]
     idx2emb_dict = {idx: embedding_dict[token]
                     for token, idx in token2idx_dict.items()}
     emb_mat = [idx2emb_dict[idx] for idx in range(len(idx2emb_dict))]
-    return emb_mat, token2idx_dict
+    return idx2token_dict, emb_mat, token2idx_dict
 
 
 def convert_to_features(args, data, word2idx_dict, char2idx_dict, is_test):
@@ -274,6 +301,9 @@ def build_features(args, examples, data_type, out_file, word2idx_dict, char2idx_
     y1s = []
     y2s = []
     ids = []
+    ## Additions for context and question strings##
+    contexts = []
+    questions = []
     for n, example in tqdm(enumerate(examples)):
         total_ += 1
 
@@ -328,8 +358,14 @@ def build_features(args, examples, data_type, out_file, word2idx_dict, char2idx_
         y1s.append(start)
         y2s.append(end)
         ids.append(example["id"])
+        ## Addition to add question and context for particular example ##
+        contexts.append(example["context"])
+        questions.append(example["question"])
 
+    ## Additions for contexts & questions
     np.savez(out_file,
+             contexts = np.array(contexts),
+             questions = np.array(questions),
              context_idxs=np.array(context_idxs),
              context_char_idxs=np.array(context_char_idxs),
              ques_idxs=np.array(ques_idxs),
@@ -353,9 +389,9 @@ def pre_process(args):
     # Process training set and use it to decide on the word/character vocabularies
     word_counter, char_counter = Counter(), Counter()
     train_examples, train_eval = process_file(args.train_file, "train", word_counter, char_counter)
-    word_emb_mat, word2idx_dict = get_embedding(
+    _, word_emb_mat, word2idx_dict = get_embedding(
         word_counter, 'word', emb_file=args.glove_file, vec_size=args.glove_dim, num_vectors=args.glove_num_vecs)
-    char_emb_mat, char2idx_dict = get_embedding(
+    _,char_emb_mat, char2idx_dict = get_embedding(
         char_counter, 'char', emb_file=None, vec_size=args.char_dim)
 
     # Process dev and test sets
