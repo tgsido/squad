@@ -22,7 +22,7 @@ from tensorboardX import SummaryWriter
 from tqdm import tqdm
 from ujson import load as json_load
 from util import collate_fn, SQuAD
-
+from generate_bert_embeddings import get_embeddings
 
 def main(args):
     # Set up logging and devices
@@ -43,6 +43,21 @@ def main(args):
     # Get embeddings
     log.info('Loading embeddings...')
     word_vectors = util.torch_from_json(args.word_emb_file)
+
+    ## Addition to get BERT embeddings ##
+    bert_train_embeddings = get_embeddings("train")
+    bert_dev_embeddings = get_embeddings("dev")
+    bert_test_embeddings = get_embeddings("test")
+
+    print("bert_train_embeddings.size() ", bert_train_embeddings.size())
+    print("bert_dev_embeddings.size() ", bert_dev_embeddings.size())
+    print("bert_test_embeddings.size() ", bert_test_embeddings.size())
+
+    print("bert_train_embeddings ", bert_train_embeddings)
+    print("bert_dev_embeddings ", bert_dev_embeddings)
+    print("bert_test_embeddings ", bert_test_embeddings)
+
+    return
 
     # Get model
     log.info('Building model...')
