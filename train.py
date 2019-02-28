@@ -44,28 +44,6 @@ def main(args):
     log.info('Loading embeddings...')
     word_vectors = util.torch_from_json(args.word_emb_file)
 
-    ## Addition to get BERT embeddings ##
-    bert_dev_embeddings = get_embeddings("dev")
-    bert_test_embeddings = get_embeddings("test")
-    bert_train_embeddings = get_embeddings("train")
-
-    print("bert_train_embeddings.size() ", bert_train_embeddings.size())
-    print("bert_dev_embeddings.size() ", bert_dev_embeddings.size())
-    print("bert_test_embeddings.size() ", bert_test_embeddings.size())
-
-    print("saving all embeddings to disk")
-    torch.save(bert_train_embeddings, 'bert_train_embeddings.pt')
-    torch.save(bert_dev_embeddings, 'bert_dev_embeddings.pt')
-    torch.save(bert_test_embeddings, 'bert_test_embeddings.pt')
-    print("done saving embeddings")
-    """
-    print("bert_train_embeddings ", bert_train_embeddings)
-    print("bert_dev_embeddings ", bert_dev_embeddings)
-    print("bert_test_embeddings ", bert_test_embeddings)
-    """
-
-    return
-
     # Get model
     log.info('Building model...')
     model = BiDAF(word_vectors=word_vectors,
@@ -118,11 +96,21 @@ def main(args):
         with torch.enable_grad(), \
                 tqdm(total=len(train_loader.dataset)) as progress_bar:
             for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in train_loader:
+
                 # Setup for forward
                 cw_idxs = cw_idxs.to(device)
                 qw_idxs = qw_idxs.to(device)
                 batch_size = cw_idxs.size(0)
                 optimizer.zero_grad()
+
+                ## Additions for BERT ##
+                bert_dev_embeddings = get_embeddings("dev", ids)
+                bert_test_embeddings = get_embeddings("test", ids)
+                bert_train_embeddings = get_embeddings("train", ids)
+
+                print("bert_train_embeddings.size() ", bert_train_embeddings.size())
+                print("bert_dev_embeddings.size() ", bert_dev_embeddings.size())
+                print("bert_test_embeddings.size() ", bert_test_embeddings.size())
 
                 # Forward
                 log_p1, log_p2 = model(cw_idxs, qw_idxs)
@@ -188,6 +176,7 @@ def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2):
     with torch.no_grad(), \
             tqdm(total=len(data_loader.dataset)) as progress_bar:
         for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in data_loader:
+
             # Setup for forward
             cw_idxs = cw_idxs.to(device)
             qw_idxs = qw_idxs.to(device)

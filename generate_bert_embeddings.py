@@ -42,10 +42,12 @@ logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s -   %(messa
 logger = logging.getLogger(__name__)
 
 
-def get_embeddings(data_type):
+def get_embeddings(data_type, ids):
+    ids = ids.tolist()
     ## SET DEVICE
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     n_gpu = torch.cuda.device_count()
+
 
     def padString(str, final_str_length):
         pad_word = "PAD"
@@ -80,11 +82,12 @@ def get_embeddings(data_type):
     examples = []
     count = 0
     for context, question, cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, id in dataset:
-        padded_context = padString(context,MAX_CONTEXT_LEN)
-        padded_question = padString(question,MAX_QUESTION_LEN)
-        examples.append(
-            InputExample(unique_id=id, text_a=padded_context, text_b=padded_question))
-        count += 1
+        if (id in ids):
+            padded_context = padString(context,MAX_CONTEXT_LEN)
+            padded_question = padString(question,MAX_QUESTION_LEN)
+            examples.append(
+                InputExample(unique_id=id, text_a=padded_context, text_b=padded_question))
+            count += 1
 
     numExamples = len(examples)
     print("numExamples: ", numExamples, " in ", data_type, " dataset")
