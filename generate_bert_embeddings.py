@@ -42,16 +42,22 @@ logger = logging.getLogger(__name__)
 
 
 def get_embeddings(data_type, ids, max_context_len, max_question_len):
+    ## SET DEVICE
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    n_gpu = torch.cuda.device_count()
+
     MAX_CONTEXT_LEN = max_context_len
     MAX_QUESTION_LEN = max_question_len
     MAX_SEQ_LENGTH = MAX_CONTEXT_LEN + MAX_QUESTION_LEN
 
     ids = ids.tolist()
-    print("ids: ", ids)
-    print("len(ids): ", len(ids))
-    ## SET DEVICE
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    n_gpu = torch.cuda.device_count()
+    #print("ids: ", ids)
+    #print("len(ids): ", len(ids))
+
+    ## Uncomment to test quickly ##
+    return torch.ones((len(ids), MAX_SEQ_LENGTH, 768), device=device)
+
+
 
 
     def padString(str, final_str_length):

@@ -41,8 +41,10 @@ def main(args):
     torch.cuda.manual_seed_all(args.seed)
 
     # Get embeddings
+
     log.info('Loading embeddings...')
     word_vectors = util.torch_from_json(args.word_emb_file)
+
 
     # Get model
     log.info('Building model...')
@@ -104,9 +106,9 @@ def main(args):
                 optimizer.zero_grad()
 
                 ## Additions for BERT ##
-                print("batch_size: ", batch_size)
+                #print("batch_size: ", batch_size)
                 bert_train_embeddings = get_embeddings("train", ids, args.para_limit, args.ques_limit)
-                print("bert_train_embeddings.size() ", bert_train_embeddings.size())
+                #print("bert_train_embeddings.size() ", bert_train_embeddings.size())
 
                 max_context_len, max_question_len = args.para_limit, args.ques_limit
                 # Forward
@@ -181,9 +183,9 @@ def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2):
             batch_size = cw_idxs.size(0)
 
             ## Additions for BERT ##
-            print("batch_size: ", batch_size)
+            #print("batch_size: ", batch_size)
             bert_dev_embeddings = get_embeddings("dev", ids, args.para_limit, args.ques_limit)
-            print("bert_dev_embeddings.size() ", bert_dev_embeddings.size())
+            #print("bert_dev_embeddings.size() ", bert_dev_embeddings.size())
 
             max_context_len, max_question_len = args.para_limit, args.ques_limit
 
