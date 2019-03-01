@@ -32,9 +32,7 @@ from pytorch_pretrained_bert.tokenization import BertTokenizer
 from pytorch_pretrained_bert.modeling import BertModel
 ## Additions ##
 from util import collate_fn, SQuAD
-MAX_CONTEXT_LEN = 350
-MAX_QUESTION_LEN = 35
-MAX_SEQ_LENGTH = MAX_CONTEXT_LEN + MAX_QUESTION_LEN
+
 
 logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
                     datefmt = '%m/%d/%Y %H:%M:%S',
@@ -42,7 +40,11 @@ logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s -   %(messa
 logger = logging.getLogger(__name__)
 
 
-def get_embeddings(data_type, ids):
+def get_embeddings(data_type, ids, max_context_len, max_question_len):
+    MAX_CONTEXT_LEN = max_context_len
+    MAX_QUESTION_LEN = max_question_len
+    MAX_SEQ_LENGTH = MAX_CONTEXT_LEN + MAX_QUESTION_LEN
+
     ids = ids.tolist()
     print("ids: ", ids)
     print("len(ids): ", len(ids))
