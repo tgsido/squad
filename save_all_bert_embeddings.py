@@ -34,7 +34,7 @@ def save_bert_embeddings(data_type, max_context_len=400, max_question_len=50):
     MAX_QUESTION_LEN = max_question_len
     MAX_SEQ_LENGTH = MAX_CONTEXT_LEN + MAX_QUESTION_LEN
 
-    ids = ids.tolist()
+    #ids = ids.tolist()
     #print("ids: ", ids)
     #print("len(ids): ", len(ids))
 
