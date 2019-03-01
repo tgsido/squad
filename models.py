@@ -124,7 +124,7 @@ class BiDAF(nn.Module):
         self.out = layers.BiDAFOutput(hidden_size=hidden_size,
                                       drop_prob=drop_prob)
 
-    def forward(self, cw_idxs, qw_idxs, bert_embeddings):
+    def forward(self, cw_idxs, qw_idxs, bert_embeddings, max_context_len, max_question_len):
         """
         c_mask = torch.zeros_like(cw_idxs) != cw_idxs
         q_mask = torch.zeros_like(qw_idxs) != qw_idxs
@@ -140,7 +140,7 @@ class BiDAF(nn.Module):
         print("bert_embeddings.size()" , bert_embeddings.size()) # (batch_size, c_len + q_len, 768)
         c_mask = torch.zeros_like(cw_idxs) != cw_idxs
         q_mask = torch.zeros_like(qw_idxs) != qw_idxs
-        c_len, q_len = c_mask.sum(-1), q_mask.sum(-1)
+        c_len, q_len = max_context_len, max_question_len
         print("c_len: ", c_len)
         print("q_len: ", q_len)
 
