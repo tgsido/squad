@@ -33,11 +33,12 @@ from pytorch_pretrained_bert.modeling import BertModel
 ## Additions ##
 from util import collate_fn, SQuAD
 
-
+"""
 logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
                     datefmt = '%m/%d/%Y %H:%M:%S',
                     level = logging.INFO)
 logger = logging.getLogger(__name__)
+"""
 
 
 def get_embeddings(data_type, ids, max_context_len, max_question_len):
@@ -126,9 +127,9 @@ def get_embeddings(data_type, ids, max_context_len, max_question_len):
     for input_ids, input_mask, example_index in eval_dataloader:
         input_ids = input_ids.to(device)
         input_mask = input_mask.to(device)
-
-        encoder_layers, _ = model(input_ids, token_type_ids=None, attention_mask=input_mask, output_all_encoded_layers=False)
-        embeddings = encoder_layers
+        with torch.no_grad():
+            encoder_layers, _ = model(input_ids, token_type_ids=None, attention_mask=input_mask, output_all_encoded_layers=False)
+            embeddings = encoder_layers
         print("encoder_layers.size() : ", encoder_layers.size())
 
     print("all done generating embeddings for ", data_type)
@@ -260,190 +261,3 @@ def _truncate_seq_pair(tokens_a, tokens_b, max_length):
             tokens_a.pop()
         else:
             tokens_b.pop()
-
-
-def read_examples(input_file):
-    """Read a list of `InputExample`s from an input file."""
-    examples = []
-    unique_id = 0
-    with open(input_file, "r", encoding='utf-8') as reader:
-        while True:
-            line = reader.readline()
-            if not line:
-                break
-            line = line.strip()
-            text_a = None
-            text_b = None
-            m = re.match(r"^(.*) \|\|\| (.*)$", line)
-            if m is None:
-                text_a = line
-            else:
-                text_a = m.group(1)
-                text_b = m.group(2)
-            examples.append(
-                InputExample(unique_id=unique_id, text_a=text_a, text_b=text_b))
-            unique_id += 1
-    return examples
-
-
-def main():
-    parser = argparse.ArgumentParser()
-
-    ## Required parameters
-    parser.add_argument("--data_type", default="None", type=str, required=True)
-    """
-    parser.add_argument("--input_file", default=None, type=str, required=True)
-    parser.add_argument("--output_file", default=None, type=str, required=True)
-    parser.add_argument("--bert_model", default=None, type=str, required=True,
-                        help="Bert pre-trained model selected in the list: bert-base-uncased, "
-                             "bert-large-uncased, bert-base-cased, bert-base-multilingual, bert-base-chinese.")
-    """
-
-    ## Other parameters
-    parser.add_argument("--do_lower_case", action='store_true', help="Set this flag if you are using an uncased model.")
-    parser.add_argument("--layers", default="-1,-2,-3,-4", type=str)
-    # default was 128 before, changed it to be 450
-    parser.add_argument("--max_seq_length", default=MAX_SEQ_LENGTH, type=int,
-                        help="The maximum total input sequence length after WordPiece tokenization. Sequences longer "
-                            "than this will be truncated, and sequences shorter than this will be padded.")
-    parser.add_argument("--batch_size", default=32, type=int, help="Batch size for predictions.")
-    parser.add_argument("--local_rank",
-                        type=int,
-                        default=-1,
-                        help = "local_rank for distributed training on gpus")
-    parser.add_argument("--no_cuda",
-                        action='store_true',
-                        help="Whether not to use CUDA when available")
-
-    args = parser.parse_args()
-
-    if args.local_rank == -1 or args.no_cuda:
-        device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
-        n_gpu = torch.cuda.device_count()
-    else:
-        device = torch.device("cuda", args.local_rank)
-        n_gpu = 1
-        # Initializes the distributed backend which will take care of sychronizing nodes/GPUs
-        torch.distributed.init_process_group(backend='nccl')
-    logger.info("device: {} n_gpu: {} distributed training: {}".format(device, n_gpu, bool(args.local_rank != -1)))
-
-    layer_indexes = [int(x) for x in args.layers.split(",")]
-
-    ## Additions ##
-    bert_model = 'bert-base-cased'
-    tokenizer = BertTokenizer.from_pretrained(bert_model, do_lower_case=args.do_lower_case)
-
-    ## Addition to read examples from memory ##
-    #examples = read_examples(args.input_file)
-    def getExamples():
-        examples = []
-
-        def padString(str, final_str_length):
-            pad_word = "PAD"
-            numWords = len(str.split())
-            #print("numWords BEFORE: ", numWords)
-            for i in range(final_str_length - numWords):
-                str += " " + pad_word
-            numWords = len(str.split())
-            #print("numWords AFTER: ", numWords)
-            return str
-
-
-        record_file = None
-        print("user specified ",args.data_type)
-        if(args.data_type == 'train'):
-            record_file = './data/train.npz'
-        elif(args.data_type == 'test'):
-            record_file = './data/test.npz'
-        elif(args.data_type == 'dev'):
-            record_file = './data/dev.npz'
-        else:
-            println("error - did not specify, train,test,or dev")
-            return
-
-        use_squad_v2 = True
-        train_dataset = SQuAD(record_file, use_squad_v2)
-        count = 0
-        for context, question, cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, id in train_dataset:
-            padded_context = padString(context,MAX_CONTEXT_LEN)
-            padded_question = padString(question,MAX_QUESTION_LEN)
-            examples.append(
-                InputExample(unique_id=id, text_a=padded_context, text_b=padded_question))
-            count += 1
-        return examples
-
-
-    examples = getExamples()
-    numExamples = len(examples)
-    print("numExamples: ", numExamples, " in ", args.data_type, " dataset")
-
-    features = convert_examples_to_features(
-        examples=examples, seq_length=MAX_SEQ_LENGTH, tokenizer=tokenizer)
-
-    unique_id_to_feature = {}
-    for feature in features:
-        unique_id_to_feature[feature.unique_id] = feature
-
-    model = BertModel.from_pretrained(bert_model)
-    model.to(device)
-
-    if args.local_rank != -1:
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.local_rank],
-                                                          output_device=args.local_rank)
-    elif n_gpu > 1:
-        model = torch.nn.DataParallel(model)
-
-    all_input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
-    all_input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
-    all_example_index = torch.arange(all_input_ids.size(0), dtype=torch.long)
-
-    eval_data = TensorDataset(all_input_ids, all_input_mask, all_example_index)
-
-
-    if args.local_rank == -1:
-        eval_sampler = SequentialSampler(eval_data)
-    else:
-        eval_sampler = DistributedSampler(eval_data)
-    eval_dataloader = DataLoader(eval_data, sampler=eval_sampler, batch_size=1)
-
-    model.eval()
-    output_file = "generated_" + args.data_type + "_bert_embeddings"
-    all_output_json = collections.OrderedDict()
-    with open(output_file, "w", encoding='utf-8') as writer:
-        for input_ids, input_mask, example_index in eval_dataloader:
-            print("progess: ", example_index.item(), " / ", (numExamples-1))
-            input_ids = input_ids.to(device)
-            input_mask = input_mask.to(device)
-
-            encoder_layers, _ = model(input_ids, token_type_ids=None, attention_mask=input_mask, output_all_encoded_layers=False)
-            encoder_layers = encoder_layers.squeeze(0)
-            print("encoder_layers.size() : ", encoder_layers.size())
-
-            feature = features[example_index.item()]
-            unique_id = int(feature.unique_id)
-
-            output_json = collections.OrderedDict()
-            output_json["example_index"] = unique_id
-            all_embedding_entries = []
-            for (i, token) in enumerate(feature.tokens):
-                embedding_entry = {}
-                embedding_entry["index"] = i
-                embedding_entry["token"] = token
-                embedding_entry["vector"] = encoder_layers[i].tolist()
-                """
-                if token == "PA" or token == "##D":
-                    embedding_entry["vector"] = torch.zeros(768).tolist()
-                else:
-                    embedding_entry["vector"] = encoder_layers[i].tolist()
-                """
-                all_embedding_entries.append(embedding_entry)
-            output_json["embedding_entries"] = all_embedding_entries
-
-            all_output_json[args.data_type + "_" + str(unique_id)] = output_json
-        writer.write(json.dumps(all_output_json) + "\n")
-        print("all done generating embeddings for ", args.data_type)
-
-"""
-if __name__ == "__main__":
-    main()
-"""
