@@ -105,11 +105,11 @@ def main(args):
 
                 ## Additions for BERT ##
                 print("batch_size: ", batch_size)
-                bert_train_embeddings = get_embeddings("train", ids)
+                bert_train_embeddings = get_embeddings("train", ids, args.para_limit, args.ques_limit)
                 print("bert_train_embeddings.size() ", bert_train_embeddings.size())
 
                 # Forward
-                log_p1, log_p2 = model(cw_idxs, qw_idxs)
+                log_p1, log_p2 = model(cw_idxs, qw_idxs, bert_train_embeddings)
                 y1, y2 = y1.to(device), y2.to(device)
                 loss = F.nll_loss(log_p1, y1) + F.nll_loss(log_p2, y2)
                 loss_val = loss.item()
@@ -178,8 +178,13 @@ def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2):
             qw_idxs = qw_idxs.to(device)
             batch_size = cw_idxs.size(0)
 
+            ## Additions for BERT ##
+            print("batch_size: ", batch_size)
+            bert_dev_embeddings = get_embeddings("dev", ids, args.para_limit, args.ques_limit)
+            print("bert_dev_embeddings.size() ", bert_dev_embeddings.size())
+
             # Forward
-            log_p1, log_p2 = model(cw_idxs, qw_idxs)
+            log_p1, log_p2 = model(cw_idxs, qw_idxs, bert_dev_embeddings)
             y1, y2 = y1.to(device), y2.to(device)
             loss = F.nll_loss(log_p1, y1) + F.nll_loss(log_p2, y2)
             nll_meter.update(loss.item(), batch_size)
