@@ -55,7 +55,7 @@ def get_embeddings(data_type, ids, max_context_len, max_question_len):
     #print("len(ids): ", len(ids))
 
     ## Uncomment to test quickly ##
-    return torch.ones((len(ids), MAX_SEQ_LENGTH, 768), device=device)
+    #return torch.ones((len(ids), MAX_SEQ_LENGTH, 768), device=device)
 
 
 
