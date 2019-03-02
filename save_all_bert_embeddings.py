@@ -152,7 +152,7 @@ def _truncate_seq_pair(tokens_a, tokens_b, max_length):
             tokens_b.pop()
 
 def save_bert_embeddings(data_type, max_context_len=400, max_question_len=50):
-    directory = data_type + "_bert_embeddings"
+    directory = "/datasquad/" + data_type + "_bert_embeddings"
     if not os.path.exists(directory):
         os.makedirs(directory)
     else:
@@ -247,7 +247,7 @@ def save_bert_embeddings(data_type, max_context_len=400, max_question_len=50):
         input_ids = input_ids.to(device)
         input_mask = input_mask.to(device)
 
-        save_dir = directory + "/"  + str(example_index) + '.pt'
+        save_dir = directory + "/"  + str(example_index.item()) + '.pt'
         if not os.path.exists(save_dir):
             with torch.no_grad():
                 encoder_layers, _ = model(input_ids, token_type_ids=None, attention_mask=input_mask, output_all_encoded_layers=False)
@@ -257,6 +257,6 @@ def save_bert_embeddings(data_type, max_context_len=400, max_question_len=50):
 
     print("all done saving embeddings for ", data_type)
 
-data_types = ['train','dev','test']
+data_types = ['dev','test','train']
 for data_type in data_types:
     save_bert_embeddings(data_type)
