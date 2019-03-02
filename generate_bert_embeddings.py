@@ -12,17 +12,17 @@ def get_embeddings(data_type, ids, max_context_len, max_question_len):
 
     ids = ids.tolist()
 
-    directory = "/datasquad/" + data_type + "/"
-    print("directory: ", directory)
+    directory = "/datasquad/" + data_type + "_bert_embeddings/"
+   # print("directory: ", directory)
 
     batch_size = len(ids)
     embeddings = torch.zeros((batch_size, MAX_SEQ_LENGTH, 768), device=device)
     for i, id in enumerate(ids):
-        file_path = directory + id + ".pt"
-        print("file_path: ", file_path)
+        file_path = directory + str(id) + ".pt"
+       # print("file_path: ", file_path)
         id_embedding = torch.load(file_path)
-        embeddings[:,i,:] = id_embedding
+        embeddings[i,:,:] = id_embedding
     end = time.time()
-    print("time to fetch bert embeddings: ", end - start)
+    #print("time to fetch bert embeddings: ", end - start)
 
     return embeddings

@@ -228,7 +228,7 @@ def save_bert_embeddings(data_type, max_context_len=400, max_question_len=50):
                 encoder_layers, _ = model(input_ids, token_type_ids=None, attention_mask=input_mask, output_all_encoded_layers=False)
                 embeddings = encoder_layers
                 print("example_index: ", unique_ids.item())
-                if(unique_ids.item() == 130017 and data_type = 'train'):
+                if(unique_ids.item() == 130017 and data_type == 'train'):
                     for i in range(100):
                         print("YEAH, got 130017")
                 torch.save(embeddings, save_dir)

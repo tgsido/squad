@@ -96,6 +96,8 @@ class RNNEncoder(nn.Module):
         # Save original padded length for use by pad_packed_sequence
         orig_len = x.size(1)
 
+        print("orig_len: " , orig_len)
+        
         # Sort by length and pack sequence for RNN
         lengths, sort_idx = lengths.sort(0, descending=True)
         x = x[sort_idx]     # (batch_size, seq_len, input_size)
