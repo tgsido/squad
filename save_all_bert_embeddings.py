@@ -16,6 +16,7 @@ from pytorch_pretrained_bert.tokenization import BertTokenizer
 from pytorch_pretrained_bert.modeling import BertModel
 ## Additions ##
 from util import collate_fn, SQuAD
+import os
 
 """
 logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
@@ -151,6 +152,12 @@ def _truncate_seq_pair(tokens_a, tokens_b, max_length):
             tokens_b.pop()
 
 def save_bert_embeddings(data_type, max_context_len=400, max_question_len=50):
+    directory = data_type + "_bert_embeddings"
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    else:
+        print("dir already exits: ", directory)
+
     ## SET DEVICE
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     n_gpu = torch.cuda.device_count()
@@ -232,23 +239,21 @@ def save_bert_embeddings(data_type, max_context_len=400, max_question_len=50):
 
     ## CREATE DATALOADER ##
     eval_sampler = SequentialSampler(eval_data)
-    eval_dataloader = DataLoader(eval_data, sampler=eval_sampler, batch_size=numExamples)
+    eval_dataloader = DataLoader(eval_data, sampler=eval_sampler, batch_size=1)
 
     model.eval()
 
-    embeddings = torch.zeros((numExamples, MAX_SEQ_LENGTH, 768), device=device)
     for input_ids, input_mask, example_index in eval_dataloader:
         input_ids = input_ids.to(device)
         input_mask = input_mask.to(device)
+        id = input_ids.tolist()[0]
+        print("id: ", id)
         with torch.no_grad():
             encoder_layers, _ = model(input_ids, token_type_ids=None, attention_mask=input_mask, output_all_encoded_layers=False)
             embeddings = encoder_layers
-        print("encoder_layers.size() : ", encoder_layers.size())
+            torch.save(embeddings, directory + "/"  + id + '.pt')
 
 
-    print("all done generating embeddings for ", data_type)
-    print("embeddings.size()", embeddings.size())
-    torch.save(embeddings, data_type + '_bert_embeddings.pt')
     print("all done saving embeddings for ", data_type)
 
 data_types = ['train','dev','test']
