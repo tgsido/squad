@@ -142,16 +142,22 @@ class BiDAFAttention(nn.Module):
 
     def forward(self, c, q, c_mask, q_mask):
         batch_size, c_len, _ = c.size()
+        """
         print("batch_size: ", batch_size)
         print("c_len: ", c_len)
+        """
         q_len = q.size(1)
+        """
         print("q_len: ", q_len)
         print("c.size(): ", c.size())
         print("q.size(): ", q.size())
+        """
         s = self.get_similarity_matrix(c, q)        # (batch_size, c_len, q_len)
+        """
         print("s.size() ", s.size())
         print("c_mask.size() :", c_mask.size())
         print("q_mask.size() :", q_mask.size())
+        """
         c_mask = c_mask.view(batch_size, c_len, 1)  # (batch_size, c_len, 1)
         q_mask = q_mask.view(batch_size, 1, q_len)  # (batch_size, 1, q_len)
         s1 = masked_softmax(s, q_mask, dim=2)       # (batch_size, c_len, q_len)

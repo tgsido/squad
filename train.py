@@ -106,11 +106,16 @@ def main(args):
                 optimizer.zero_grad()
 
                 ## Additions for BERT ##
+                max_context_len, max_question_len = args.para_limit, args.ques_limit
                 #print("batch_size: ", batch_size)
                 bert_train_embeddings = get_embeddings("train", ids, args.para_limit, args.ques_limit)
+                """
+                bert_train_embeddings = torch.ones((len(ids.tolist()), \
+                 max_context_len + max_question_len, 768), device=device)
+                """
                 #print("bert_train_embeddings.size() ", bert_train_embeddings.size())
 
-                max_context_len, max_question_len = args.para_limit, args.ques_limit
+
                 # Forward
                 log_p1, log_p2 = model(cw_idxs, qw_idxs, bert_train_embeddings, \
                 max_context_len, max_question_len)
