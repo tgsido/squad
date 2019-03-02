@@ -246,13 +246,14 @@ def save_bert_embeddings(data_type, max_context_len=400, max_question_len=50):
     for input_ids, input_mask, example_index in eval_dataloader:
         input_ids = input_ids.to(device)
         input_mask = input_mask.to(device)
-        print("example_index: ", example_index)
-        with torch.no_grad():
-            encoder_layers, _ = model(input_ids, token_type_ids=None, attention_mask=input_mask, output_all_encoded_layers=False)
-            embeddings = encoder_layers
-            torch.save(embeddings, directory + "/"  +
-            str(example_index) + '.pt')
 
+        save_dir = directory + "/"  + str(example_index) + '.pt'
+        if not os.path.exists(save_dir):
+            with torch.no_grad():
+                encoder_layers, _ = model(input_ids, token_type_ids=None, attention_mask=input_mask, output_all_encoded_layers=False)
+                embeddings = encoder_layers
+                print("example_index: ", example_index.item())
+                torch.save(embeddings, save_dir)
 
     print("all done saving embeddings for ", data_type)
 
