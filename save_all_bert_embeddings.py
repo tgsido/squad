@@ -18,12 +18,6 @@ from pytorch_pretrained_bert.modeling import BertModel
 from util import collate_fn, SQuAD
 import os
 
-"""
-logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
-                    datefmt = '%m/%d/%Y %H:%M:%S',
-                    level = logging.INFO)
-logger = logging.getLogger(__name__)
-"""
 class InputExample(object):
 
     def __init__(self, unique_id, text_a, text_b):
@@ -115,16 +109,6 @@ def convert_examples_to_features(examples, seq_length, tokenizer):
         assert len(input_mask) == seq_length
         assert len(input_type_ids) == seq_length
 
-        """
-        if ex_index < 5:
-            logger.info("*** Example ***")
-            logger.info("unique_id: %s" % (example.unique_id))
-            logger.info("tokens: %s" % " ".join([str(x) for x in tokens]))
-            logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
-            logger.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
-            logger.info(
-                "input_type_ids: %s" % " ".join([str(x) for x in input_type_ids]))
-        """
         features.append(
             InputFeatures(
                 unique_id=example.unique_id,
@@ -166,24 +150,12 @@ def save_bert_embeddings(data_type, max_context_len=400, max_question_len=50):
     MAX_QUESTION_LEN = max_question_len
     MAX_SEQ_LENGTH = MAX_CONTEXT_LEN + MAX_QUESTION_LEN
 
-    #ids = ids.tolist()
-    #print("ids: ", ids)
-    #print("len(ids): ", len(ids))
-
-    ## Uncomment to test quickly ##
-    #return torch.ones((len(ids), MAX_SEQ_LENGTH, 768), device=device)
-
-
-
-
     def padString(str, final_str_length):
         pad_word = "PAD"
         numWords = len(str.split())
-        #print("numWords BEFORE: ", numWords)
         for i in range(final_str_length - numWords):
             str += " " + pad_word
         numWords = len(str.split())
-        #print("numWords AFTER: ", numWords)
         return str
 
     ## BERT MODEL TYPE AND TOKENIZER ##
@@ -212,6 +184,8 @@ def save_bert_embeddings(data_type, max_context_len=400, max_question_len=50):
 
     print("dataset ids len: ", len(dataset))
     for context, question, cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, id in dataset:
+        if id == 130017 and data_type == "train":
+            print("did process 130017")
         padded_context = padString(context,MAX_CONTEXT_LEN)
         padded_question = padString(question,MAX_QUESTION_LEN)
         examples.append(
@@ -230,12 +204,13 @@ def save_bert_embeddings(data_type, max_context_len=400, max_question_len=50):
     if n_gpu > 1:
         model = torch.nn.DataParallel(model)
 
+    all_unique_ids = torch.tensor([f.unique_id for f in features], dtype=torch.long)
     all_input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
     all_input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
     all_example_index = torch.arange(all_input_ids.size(0), dtype=torch.long)
 
     ## CREATE TENSORDATASET ##
-    eval_data = TensorDataset(all_input_ids, all_input_mask, all_example_index)
+    eval_data = TensorDataset(all_unique_ids, all_input_ids, all_input_mask, all_example_index)
 
     ## CREATE DATALOADER ##
     eval_sampler = SequentialSampler(eval_data)
@@ -243,20 +218,23 @@ def save_bert_embeddings(data_type, max_context_len=400, max_question_len=50):
 
     model.eval()
 
-    for input_ids, input_mask, example_index in eval_dataloader:
+    for unique_ids, input_ids, input_mask, example_index in eval_dataloader:
         input_ids = input_ids.to(device)
         input_mask = input_mask.to(device)
 
-        save_dir = directory + "/"  + str(example_index.item()) + '.pt'
+        save_dir = directory + "/"  + str(unique_ids.item()) + '.pt'
         if not os.path.exists(save_dir):
             with torch.no_grad():
                 encoder_layers, _ = model(input_ids, token_type_ids=None, attention_mask=input_mask, output_all_encoded_layers=False)
                 embeddings = encoder_layers
-                print("example_index: ", example_index.item())
+                print("example_index: ", unique_ids.item())
+                if(unique_ids.item() == 130017 and data_type = 'train'):
+                    for i in range(100):
+                        print("YEAH, got 130017")
                 torch.save(embeddings, save_dir)
 
     print("all done saving embeddings for ", data_type)
 
-data_types = ['dev','test','train']
+data_types = ['dev', 'test', 'train']
 for data_type in data_types:
     save_bert_embeddings(data_type)
