@@ -11,7 +11,8 @@ def get_embeddings(data_type, ids, max_context_len, max_question_len):
     MAX_SEQ_LENGTH = MAX_CONTEXT_LEN + MAX_QUESTION_LEN
 
     ids = ids.tolist()
-
+    ##
+    #return torch.ones((len(ids),MAX_SEQ_LENGTH,768),device=device)
     directory = "/datasquad/" + data_type + "_bert_embeddings/"
    # print("directory: ", directory)
 
