@@ -81,7 +81,7 @@ def get_example_args():
                         help='Process examples from the test set')
     parser.add_argument('--eval_steps',
                         type=int,
-                        default=50000,
+                        default=5000,
                         help='Number of steps between successive evaluations.')
     parser.add_argument('--lr',
                         type=float,
@@ -226,7 +226,7 @@ def get_train_args():
 
     parser.add_argument('--eval_steps',
                         type=int,
-                        default=50000,
+                        default=5000, #changed to 5k for more evaluation
                         help='Number of steps between successive evaluations.')
     parser.add_argument('--lr',
                         type=float,
