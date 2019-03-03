@@ -167,22 +167,25 @@ class BiDAF(nn.Module):
         print("bert_c_emb.size() ", bert_c_emb.size())
         print("bert_q_emb.size() ", bert_q_emb.size())
         """
-
+        """
         print("c_len: ", c_len)
         print("q_len: ", q_len)
+        """
 
         c_emb = bert_c_emb[:,0:torch.max(c_len),:] # (batch_size, c_len, hidden_size)
         q_emb = bert_q_emb[:,0:torch.max(q_len),:] # (batch_size, q_len, hidden_size)
 
-
+        """
         print("c_emb.size() ", c_emb.size())
         print("q_emb.size() ", q_emb.size())
+        """
 
         c_enc = self.enc(c_emb, c_len)    # (batch_size, c_len, 2 * hidden_size)
         q_enc = self.enc(q_emb, q_len)    # (batch_size, q_len, 2 * hidden_size)
-
+        """
         print("c_enc.size() ", c_enc.size())
         print("q_enc.size() ", q_enc.size())
+        """
 
         att = self.att(c_enc, q_enc,
                        c_mask, q_mask)    # (batch_size, c_len, 8 * hidden_size)
