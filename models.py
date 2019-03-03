@@ -138,10 +138,12 @@ class BiDAF(nn.Module):
         """
         c_mask = torch.zeros_like(cw_idxs) != cw_idxs
         q_mask = torch.zeros_like(qw_idxs) != qw_idxs
+
+        ## Addition to enforce max_len for context and question
+        c_mask = c_mask[:,:max_context_len]
+        q_mask = q_mask[:,:max_question_len]
         c_len, q_len = c_mask.sum(-1), q_mask.sum(-1)
 
-        c_len[c_len > max_context_len] = max_context_len
-        q_len[q_len > max_question_len] = max_question_len
 
         """
         print("cw_idxs.size()", cw_idxs.size())
