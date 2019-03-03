@@ -140,6 +140,9 @@ class BiDAF(nn.Module):
         q_mask = torch.zeros_like(qw_idxs) != qw_idxs
         c_len, q_len = c_mask.sum(-1), q_mask.sum(-1)
 
+        c_len[c_len > max_context_len] = max_context_len
+        q_len[q_len > max_question_len] = max_question_len
+
         """
         print("cw_idxs.size()", cw_idxs.size())
         print("qw_idxs.size()", qw_idxs.size())
@@ -178,7 +181,7 @@ class BiDAF(nn.Module):
 
         print("c_enc.size() ", c_enc.size())
         print("q_enc.size() ", q_enc.size())
-        
+
         att = self.att(c_enc, q_enc,
                        c_mask, q_mask)    # (batch_size, c_len, 8 * hidden_size)
 
