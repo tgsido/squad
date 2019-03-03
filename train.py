@@ -32,7 +32,7 @@ def main(args):
     device, args.gpu_ids = util.get_available_devices()
     log.info('Args: {}'.format(dumps(vars(args), indent=4, sort_keys=True)))
     # Comment out to only use 1 GPU on nv12
-    #args.batch_size *= max(1, len(args.gpu_ids))
+    args.batch_size *= max(1, len(args.gpu_ids))
 
     # Set random seed
     log.info('Using random seed {}...'.format(args.seed))

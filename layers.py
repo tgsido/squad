@@ -96,15 +96,21 @@ class RNNEncoder(nn.Module):
         # Save original padded length for use by pad_packed_sequence
         orig_len = x.size(1)
 
-        #print("orig_len: " , orig_len)
+        #
+        print("orig_len: " , orig_len)
 
         # Sort by length and pack sequence for RNN
         lengths, sort_idx = lengths.sort(0, descending=True)
         x = x[sort_idx]     # (batch_size, seq_len, input_size)
+        print("x.size(): " , x.size())
         x = pack_padded_sequence(x, lengths, batch_first=True)
+        print("After pack_padded_sequence - x.size(): " , x.size())
+
+        assert orig_len <= torch.max(lengths)
 
         # Apply RNN
         x, _ = self.rnn(x)  # (batch_size, seq_len, 2 * hidden_size)
+        print("After rnn - x.size(): " , x.size())
 
         # Unpack and reverse sort
         x, _ = pad_packed_sequence(x, batch_first=True, total_length=orig_len)
