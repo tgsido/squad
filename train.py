@@ -105,6 +105,7 @@ def main(args):
                 if(count_skip % 5 == 1 or count_skip % 5 == 2 or count_skip % 5 == 3 or count_skip % 5 == 4):
                     step += batch_size
                     progress_bar.update(batch_size)
+                    steps_till_eval -= batch_size
                     continue
                 # Setup for forward
                 cw_idxs = cw_idxs.to(device)
