@@ -101,7 +101,7 @@ def main(args):
                 tqdm(total=len(train_loader.dataset)) as progress_bar:
             for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in train_loader:
                 count_skip += 1
-                if(count % 4 == 3):
+                if(count_skip % 5 == 3 or count_skip % 5 == 4):
                     print("skipping set")
                     continue
                 # Setup for forward
