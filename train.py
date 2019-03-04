@@ -100,9 +100,11 @@ def main(args):
         with torch.enable_grad(), \
                 tqdm(total=len(train_loader.dataset)) as progress_bar:
             for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in train_loader:
+                batch_size = cw_idxs.size(0)
                 count_skip += 1
-                if(count_skip % 5 == 3 or count_skip % 5 == 4):
-                    print("skipping set")
+                if(count_skip % 5 == 1 or count_skip % 5 == 2 or count_skip % 5 == 3 or count_skip % 5 == 4):
+                    step += batch_size
+                    progress_bar.update(batch_size)
                     continue
                 # Setup for forward
                 cw_idxs = cw_idxs.to(device)
