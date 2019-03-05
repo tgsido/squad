@@ -19,24 +19,39 @@ class BERT(nn.Module):
     """
     def __init__(self, word_vectors, hidden_size, drop_prob=0.):
         super(BERT, self).__init__()
+        self.emb = layers.Embedding(word_vectors=word_vectors,
+                                    hidden_size=300,
+                                    drop_prob=drop_prob)
+
+
         self.bert_start = nn.Linear(
-            in_features = hidden_size,
+            in_features = 300,
             out_features = 1,
             bias = True
         )
         nn.init.xavier_uniform_(self.bert_start.weight,gain=1)
 
         self.bert_end = nn.Linear(
-            in_features = hidden_size,
+            in_features = 300,
             out_features = 1,
             bias = True
         )
         nn.init.xavier_uniform_(self.bert_end.weight,gain=1)
 
+        self.proj_up = nn.Linear(
+            in_features = 300,
+            out_features = hidden_size,
+            bias = True
+        )
+
+        self.proj_down = nn.Linear(
+            in_features = hidden_size,
+            out_features = 300,
+            bias = True
+        )
+        nn.init.xavier_uniform_(self.proj_down.weight,gain=1)
 
 
-        self.out = layers.BiDAFOutput(hidden_size=hidden_size,
-                                      drop_prob=drop_prob)
 
     def forward(self, cw_idxs, qw_idxs, bert_embeddings, max_context_len, max_question_len):
         c_mask = torch.zeros_like(cw_idxs) != cw_idxs
@@ -44,8 +59,15 @@ class BERT(nn.Module):
         c_len, q_len = c_mask.sum(-1), q_mask.sum(-1)
 
         #c_len, q_len = max_context_len, max_question_len
+        glove_c_emb = self.emb(cw_idxs) # (batch_size, c_len, 300)
+        glove_q_emb = self.emb(qw_idxs) # (batch_size, c_len, 300)
+        #print("word_vec_emb.size() before : ", word_vec_emb.size())
+        #word_vec_emb = self.proj_up(word_vec_emb) # (batch_size, c_len, hidden_size)
+        #print("word_vec_emb.size() after: ", word_vec_emb.size())
 
         c_emb = bert_embeddings[:,0:torch.max(c_len),:] # (batch_size, c_len, hidden_size)
+        c_emb = self.proj_down(torch.nn.functional.relu(c_emb)) # (batch_size, c_len, 300)
+        c_emb = c_emb + c_emb * glove_c_emb
 
         start_logits = self.bert_start(c_emb) # (batch_size, c_len, 1)
         end_logits = self.bert_end(c_emb) # (batch_size, c_len, 1)
@@ -108,13 +130,6 @@ class DCN(nn.Module):
             c_emb = self.emb(cw_idxs)         # (batch_size, c_len, hidden_size)
             q_emb = self.emb(qw_idxs)         # (batch_size, q_len, hidden_size)
 
-        """
-        print("c_len: ", c_len)
-        print("q_len: ", q_len)
-        print("c_emb.size() ", c_emb.size())
-        print("q_emb.size() ", q_emb.size())
-        """
-
         att = self.att(c_enc, q_enc,
                        c_mask, q_mask)    # (batch_size, c_len, 8 * hidden_size)
 
@@ -166,6 +181,20 @@ class BiDAF(nn.Module):
         self.out = layers.BiDAFOutput(hidden_size=hidden_size,
                                       drop_prob=drop_prob)
 
+        self.proj_bert_down = nn.Linear(
+            in_features = 768,
+            out_features = hidden_size,
+            bias = True
+        )
+        nn.init.xavier_uniform_(self.proj_bert_down.weight,gain=1)
+
+        self.proj_glove_down = nn.Linear(
+            in_features = 300,
+            out_features = hidden_size,
+            bias = True
+        )
+        nn.init.xavier_uniform_(self.proj_glove_down.weight,gain=1)
+
     def forward(self, cw_idxs, qw_idxs, bert_embeddings, max_context_len, max_question_len):
         """
         c_mask = torch.zeros_like(cw_idxs) != cw_idxs
@@ -200,8 +229,9 @@ class BiDAF(nn.Module):
 
         #print("bert_embeddings.size()" , bert_embeddings.size()) # (batch_size, max_context_len + max_question_len, 768)
 
-        bert_c_emb = bert_embeddings[:,0:max_context_len,:]
-        bert_q_emb = bert_embeddings[:,max_context_len:,:]
+        bert_embeddings = torch.nn.functional.relu(self.proj_bert_down(bert_embeddings))
+        bert_c_emb = bert_embeddings[:,0:torch.max(c_len),:]
+        bert_q_emb = bert_embeddings[:,max_context_len: max_context_len + torch.max(q_len),:]
         """
         print("bert_c_emb.size() ", bert_c_emb.size())
         print("bert_q_emb.size() ", bert_q_emb.size())
@@ -210,9 +240,14 @@ class BiDAF(nn.Module):
         print("c_len: ", c_len)
         print("q_len: ", q_len)
         """
-
-        c_emb = bert_c_emb[:,0:torch.max(c_len),:] # (batch_size, c_len, hidden_size)
-        q_emb = bert_q_emb[:,0:torch.max(q_len),:] # (batch_size, q_len, hidden_size)
+        c_emb = self.emb(cw_idxs)         # (batch_size, c_len, 300)
+        q_emb = self.emb(qw_idxs)         # (batch_size, q_len, 300)
+        """
+        print("c_emb.size() ", c_emb.size())
+        print("q_emb.size() ", q_emb.size())
+        """
+        c_emb = c_emb  +  c_emb * bert_c_emb # (batch_size, c_len, 100/ hidden_size)
+        q_emb = q_emb + q_emb * bert_q_emb # (batch_size, q_len, 100/ hidden_size)
 
         """
         print("c_emb.size() ", c_emb.size())
