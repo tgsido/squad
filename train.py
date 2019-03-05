@@ -17,7 +17,7 @@ import util
 from args import get_train_args
 from collections import OrderedDict
 from json import dumps
-from models import BiDAF
+from models import BiDAF, BERT, DCN
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
 from ujson import load as json_load
@@ -49,9 +49,20 @@ def main(args):
 
     # Get model
     log.info('Building model...')
-    model = BiDAF(word_vectors=word_vectors,
-                  hidden_size=args.hidden_size,
-                  drop_prob=args.drop_prob)
+    if(args.model_type == "bidaf" or args.model_type == "bert-bidaf"):
+        model = BiDAF(word_vectors=word_vectors,
+                      hidden_size=args.hidden_size,
+                      drop_prob=args.drop_prob)
+    elif(args.model_type == "dcn" or args.model_type == "dcn-bidaf"):
+        model = DCN(word_vectors=word_vectors,
+                      hidden_size=args.hidden_size,
+                      drop_prob=args.drop_prob)
+    elif(args.model_type == "bert-basic"):
+        model = BERT(word_vectors=word_vectors,
+                      hidden_size=args.hidden_size,
+                      drop_prob=args.drop_prob)
+
+
     model = nn.DataParallel(model, args.gpu_ids)
     if args.load_path:
         log.info('Loading checkpoint from {}...'.format(args.load_path))
@@ -102,7 +113,7 @@ def main(args):
             for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in train_loader:
                 batch_size = cw_idxs.size(0)
                 count_skip += 1
-                if(count_skip % 5 == 1 or count_skip % 5 == 2 or count_skip % 5 == 3 or count_skip % 5 == 4):
+                if(args.skip_examples == True and (count_skip % 5 == 1 or count_skip % 5 == 2 or count_skip % 5 == 3 or count_skip % 5 == 4)):
                     step += batch_size
                     progress_bar.update(batch_size)
                     steps_till_eval -= batch_size

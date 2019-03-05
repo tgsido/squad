@@ -290,6 +290,14 @@ def get_train_args():
                         type=int,
                         default=100,
                         help='Max number of words in a question at test time')
+    parser.add_argument('--skip_examples',
+                        type=lambda s: s.lower().startswith('t'),
+                        default=True,
+                        help='Whether to skip training examples: type in True or False')
+    parser.add_argument('--model_type',
+                        type=str,
+                        default='bert-bidaf',
+                        help='Switch between different models: select bert-basic, bidaf, bert-bidaf, dcn, bert-dcn')
 
     args = parser.parse_args()
 

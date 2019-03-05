@@ -7,9 +7,58 @@ Author:
 import layers
 import torch
 import torch.nn as nn
+from util import masked_softmax
 
-class DynamicCoAttention(nn.Module):
-    """DynamicCoAttention model for SQuAD.
+class BERT(nn.Module):
+    """BERT model for SQuAD.
+
+    Args:
+        word_vectors (torch.Tensor): Pre-trained word vectors.
+        hidden_size (int): Number of features in the hidden state at each layer.
+        drop_prob (float): Dropout probability.
+    """
+    def __init__(self, word_vectors, hidden_size, drop_prob=0.):
+        super(BERT, self).__init__()
+        self.bert_start = nn.Linear(
+            in_features = hidden_size,
+            out_features = 1,
+            bias = True
+        )
+        nn.init.xavier_uniform_(self.bert_start.weight,gain=1)
+
+        self.bert_end = nn.Linear(
+            in_features = hidden_size,
+            out_features = 1,
+            bias = True
+        )
+        nn.init.xavier_uniform_(self.bert_end.weight,gain=1)
+
+
+
+        self.out = layers.BiDAFOutput(hidden_size=hidden_size,
+                                      drop_prob=drop_prob)
+
+    def forward(self, cw_idxs, qw_idxs, bert_embeddings, max_context_len, max_question_len):
+        c_mask = torch.zeros_like(cw_idxs) != cw_idxs
+        q_mask = torch.zeros_like(qw_idxs) != qw_idxs
+        c_len, q_len = c_mask.sum(-1), q_mask.sum(-1)
+
+        #c_len, q_len = max_context_len, max_question_len
+
+        c_emb = bert_embeddings[:,0:torch.max(c_len),:] # (batch_size, c_len, hidden_size)
+
+        start_logits = self.bert_start(c_emb) # (batch_size, c_len, 1)
+        end_logits = self.bert_end(c_emb) # (batch_size, c_len, 1)
+
+        log_p1 = masked_softmax(start_logits.squeeze(), c_mask, log_softmax=True) # (batch_size, c_len)
+        log_p2 = masked_softmax(end_logits.squeeze(), c_mask, log_softmax=True) # (batch_size, c_len)
+
+        out = log_p1, log_p2
+        return out # 2 tensors, each (batch_size, c_len)
+
+
+class DCN(nn.Module):
+    """Dynamic Co-Attention model for SQuAD.
 
     Follows a high-level structure commonly found in SQuAD models:
         - Embedding layer: Embed word indices to get word vectors / utilizes BERT embeddings.
@@ -24,28 +73,21 @@ class DynamicCoAttention(nn.Module):
         drop_prob (float): Dropout probability.
     """
     def __init__(self, word_vectors, hidden_size, drop_prob=0.):
-        super(DynamicCoAttention, self).__init__()
+        super(DCN, self).__init__()
         self.emb = layers.Embedding(word_vectors=word_vectors,
                                     hidden_size=hidden_size,
                                     drop_prob=drop_prob)
 
-        self.enc = layers.RNNEncoder(input_size=hidden_size,
+        self.att = layers.DCNAttention(hidden_size=2 * hidden_size,
+                                         drop_prob=drop_prob)
+
+        self.att_encoder = layers.LSTMEncoder(input_size=hidden_size,
                                      hidden_size=hidden_size,
                                      num_layers=1,
                                      drop_prob=drop_prob)
 
-        self.att = layers.DCNAttention(hidden_size=2 * hidden_size,
-                                         drop_prob=drop_prob)
 
-        self.mod = layers.RNNEncoder(input_size=8 * hidden_size,
-                                     hidden_size=hidden_size,
-                                     num_layers=2,
-                                     drop_prob=drop_prob)
-
-        self.out = layers.BiDAFOutput(hidden_size=hidden_size,
-                                      drop_prob=drop_prob)
-
-    def forward(self, cw_idxs, qw_idxs, bert_embeddings, max_context_len, max_question_len):
+    def forward(self, cw_idxs, qw_idxs, bert_embeddings, max_context_len, max_question_len, use_bert_embeddings=True):
         """
         c_mask = torch.zeros_like(cw_idxs) != cw_idxs
         q_mask = torch.zeros_like(qw_idxs) != qw_idxs
@@ -58,26 +100,23 @@ class DynamicCoAttention(nn.Module):
         q_mask = torch.zeros_like(qw_idxs) != qw_idxs
         c_len, q_len = c_mask.sum(-1), q_mask.sum(-1)
 
-        #print("bert_embeddings.size()" , bert_embeddings.size()) # (batch_size, c_len + q_len, 768)
-        c_len, q_len = max_context_len, max_question_len
+        context_range = min(max_context_len,torch.max(c_len))
+        if(use_bert_embeddings is True):
+            c_emb = bert_embeddings[:,0:context_range,:]  # (batch_size, c_len, hidden_size)
+            q_emb = bert_embeddings[:,context_range:,:]  # (batch_size, q_len, hidden_size)
+        else:
+            c_emb = self.emb(cw_idxs)         # (batch_size, c_len, hidden_size)
+            q_emb = self.emb(qw_idxs)         # (batch_size, q_len, hidden_size)
+
         """
         print("c_len: ", c_len)
         print("q_len: ", q_len)
-        """
-
-        c_emb = bert_embeddings[:,0:c_len,:]
-        q_emb = bert_embeddings[:,c_len:,:]
-        """
         print("c_emb.size() ", c_emb.size())
         print("q_emb.size() ", q_emb.size())
         """
-        c_enc = self.enc(c_emb, c_len)    # (batch_size, c_len, 2 * hidden_size)
-        q_enc = self.enc(q_emb, q_len)    # (batch_size, q_len, 2 * hidden_size)
 
         att = self.att(c_enc, q_enc,
                        c_mask, q_mask)    # (batch_size, c_len, 8 * hidden_size)
-
-        mod = self.mod(att, c_len)        # (batch_size, c_len, 2 * hidden_size)
 
         out = self.out(att, mod, c_mask)  # 2 tensors, each (batch_size, c_len)
 
