@@ -240,12 +240,12 @@ class BiDAF(nn.Module):
         print("c_len: ", c_len)
         print("q_len: ", q_len)
         """
-        c_emb = self.emb(cw_idxs)         # (batch_size, c_len, 300)
-        q_emb = self.emb(qw_idxs)         # (batch_size, q_len, 300)
-        """
+        c_emb = self.emb(cw_idxs)[:,:max_context_len,:]         # (batch_size, c_len, 300)
+        q_emb = self.emb(qw_idxs)[:,:max_question_len,:]         # (batch_size, q_len, 300)
+
         print("c_emb.size() ", c_emb.size())
         print("q_emb.size() ", q_emb.size())
-        """
+
         c_emb = c_emb  +  c_emb * bert_c_emb # (batch_size, c_len, 100/ hidden_size)
         q_emb = q_emb + q_emb * bert_q_emb # (batch_size, q_len, 100/ hidden_size)
 
