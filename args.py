@@ -330,6 +330,40 @@ def get_test_args():
                         type=str,
                         default='submission.csv',
                         help='Name for submission file.')
+    ## Additions to faciliate downstream training tasks ##
+    parser.add_argument('--ans_limit',
+                        type=int,
+                        default=30,
+                        help='Max number of words in a training example answer')
+    parser.add_argument('--char_limit',
+                        type=int,
+                        default=16,
+                        help='Max number of chars to keep from a word')
+    parser.add_argument('--para_limit',
+                        type=int,
+                        default=400,
+                        help='Max number of words in a paragraph')
+    parser.add_argument('--ques_limit',
+                        type=int,
+                        default=50,
+                        help='Max number of words to keep from a question')
+    parser.add_argument('--test_para_limit',
+                        type=int,
+                        default=1000,
+                        help='Max number of words in a paragraph at test time')
+    parser.add_argument('--test_ques_limit',
+                        type=int,
+                        default=100,
+                        help='Max number of words in a question at test time')
+    parser.add_argument('--skip_examples',
+                        type=lambda s: s.lower().startswith('t'),
+                        default=True,
+                        help='Whether to skip training examples: type in True or False')
+    parser.add_argument('--model_type',
+                        type=str,
+                        default='bert-bidaf',
+                        help='Switch between different models: select bert-basic, bidaf, bert-bidaf, dcn, bert-dcn')
+
 
     # Require load_path for test.py
     args = parser.parse_args()
