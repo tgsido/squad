@@ -49,19 +49,27 @@ def main(args):
 
     # Get model
     log.info('Building model...')
+    model = None
+    max_context_len, max_question_len = args.para_limit, args.ques_limit
     if(args.model_type == "bidaf" or args.model_type == "bert-bidaf"):
         model = BiDAF(word_vectors=word_vectors,
                       hidden_size=args.hidden_size,
                       drop_prob=args.drop_prob)
-    elif(args.model_type == "dcn" or args.model_type == "dcn-bidaf"):
+    elif(args.model_type == "dcn" or args.model_type == "bert-dcn"):
         model = DCN(word_vectors=word_vectors,
                       hidden_size=args.hidden_size,
-                      drop_prob=args.drop_prob)
+                      max_context_len=max_context_len,
+                      max_question_len=max_question_len,
+                      drop_prob=args.drop_prob
+                      )
     elif(args.model_type == "bert-basic"):
         model = BERT(word_vectors=word_vectors,
                       hidden_size=args.hidden_size,
                       drop_prob=args.drop_prob)
 
+    if model is None:
+        raise ValueError('Model is unassigned. Please ensure --model_type \
+        chooses between {bidaf, bert-bidaf, dcn, bert-dcn, bert-basic} ')
 
     model = nn.DataParallel(model, args.gpu_ids)
     if args.load_path:
@@ -137,7 +145,7 @@ def main(args):
 
                 # Forward
                 log_p1, log_p2 = model(cw_idxs, qw_idxs, bert_train_embeddings, \
-                max_context_len, max_question_len)
+                max_context_len, max_question_len, device)
                 y1, y2 = y1.to(device), y2.to(device)
                 loss = F.nll_loss(log_p1, y1) + F.nll_loss(log_p2, y2)
                 loss_val = loss.item()
@@ -216,7 +224,7 @@ def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2, args)
 
             # Forward
             log_p1, log_p2 = model(cw_idxs, qw_idxs, bert_dev_embeddings, \
-            max_context_len, max_question_len)
+            max_context_len, max_question_len, device)
             y1, y2 = y1.to(device), y2.to(device)
             loss = F.nll_loss(log_p1, y1) + F.nll_loss(log_p2, y2)
             nll_meter.update(loss.item(), batch_size)

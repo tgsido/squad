@@ -131,34 +131,115 @@ class DCNAttention(nn.Module):
         hidden_size (int): Size of hidden activations.
         drop_prob (float): Probability of zero-ing out activations.
     """
-    def __init__(self, hidden_size, drop_prob=0.1):
+    def __init__(self, hidden_size, max_context_len, max_question_len, drop_prob=0.1):
         super(DCNAttention, self).__init__()
         self.drop_prob = drop_prob
+
+        self.max_question_len = max_question_len
+        self.max_context_len = max_context_len
+
+        self.W_prime_layer = nn.Linear(
+            in_features = hidden_size,
+            out_features = hidden_size,
+            bias = True
+        )
+        nn.init.xavier_uniform_(self.W_prime_layer.weight,gain=1)
+
+        self.c_sentinel = nn.Parameter(torch.zeros(1,hidden_size))
+        nn.init.xavier_uniform_(self.c_sentinel)
+
+        self.q_sentinel = nn.Parameter(torch.zeros(1,hidden_size))
+        nn.init.xavier_uniform_(self.q_sentinel)
+
+        self.lstmEncoder= torch.nn.LSTM(
+            input_size = 2 * hidden_size,
+            hidden_size = 2 * hidden_size,
+            num_layers = 1,
+            bias = True,
+            batch_first = True,
+            dropout = self.drop_prob,
+            bidirectional = True
+        )
+        """
         self.c_weight = nn.Parameter(torch.zeros(hidden_size, 1))
         self.q_weight = nn.Parameter(torch.zeros(hidden_size, 1))
         self.cq_weight = nn.Parameter(torch.zeros(1, 1, hidden_size))
         for weight in (self.c_weight, self.q_weight, self.cq_weight):
             nn.init.xavier_uniform_(weight)
         self.bias = nn.Parameter(torch.zeros(1))
+        """
+    """
+        Forward pass of DCN attention layer.
 
-    def forward(self, c, q, c_mask, q_mask):
-        batch_size, c_len, _ = c.size()
-        """
-        print("batch_size: ", batch_size)
-        print("c_len: ", c_len)
-        """
+        @param c: tensor of floats, shape (batch_size, c_len, hidden_size)
+        @param q: tensor of floats, shape (batch_size, q_len, hidden_size)
+
+        @returns x:  shape (batch_size, c_len, hidden_size * 8)
+    """
+    def forward(self, c, q, c_mask, q_mask, device):
+        batch_size, c_len, hidden_size = c.size()
         q_len = q.size(1)
+
+        N = c_len
+        M = q_len
+        #print("batch_size: ", batch_size)
+        #print("N/c_len : ", N)
+        #print("M/q_len : ", M)
+
+        ### PROJECTED HIDDEN STATES ###
+        q_inter = torch.cat([q, torch.zeros((batch_size, self.max_question_len - q_len, hidden_size), device=device)], dim=1) # (bs, max_question_len, hidden_size)
+        #print("q_inter.size(): ", q_inter.size())
+        q_prime_full = torch.nn.functional.tanh(self.W_prime_layer(q_inter)) # (bs, max_question_len, hidden_size)
+        #print("q_prime_full.size(): ", q_prime_full.size())
+        q_prime = q_prime_full[:,:M,:] # (bs, M, hidden_size)
+        #print("q_prime.size(): ", q_prime.size())
+
+        ### ADDING SENTINEL STATES ###
+        c_sentinel_batch = torch.ones((batch_size, self.c_sentinel.size(0), self.c_sentinel.size(1)),  device=device) * self.c_sentinel
+        q_sentinel_batch = torch.ones((batch_size, self.q_sentinel.size(0), self.q_sentinel.size(1)),  device=device) * self.q_sentinel
+        c_new = torch.cat([c, c_sentinel_batch], dim=1) # (bs, N+1, hidden_size)
+        q_new = torch.cat([q_prime, q_sentinel_batch], dim=1) # (bs, M+1, hidden_size)
+
+        ### AFFINITY MATRIX: L ###
+        row_of_zeros = torch.zeros((batch_size,1), device=device) # (bs, 1)
+        adj_c_mask = torch.cat([c_mask.float(), row_of_zeros], dim = 1) # (bs, N + 1)
+        adj_q_mask = torch.cat([q_mask.float(), row_of_zeros], dim = 1) # (bs, M + 1)
+        adj_c_mask_unsqueezed = torch.unsqueeze(adj_c_mask, dim = -1) # (bs, N + 1, 1)
+        adj_q_mask_unsqueezed = torch.unsqueeze(adj_q_mask, dim = 1) # (bs, 1, M + 1)
+        L_mask = adj_c_mask_unsqueezed * adj_q_mask_unsqueezed # (bs, N + 1, M+1)
+        q_new_perm = q_new.permute(0,2,1) # (bs, hidden_size, M+1)
+        L = torch.bmm(c_new,q_new_perm) # (bs, N+1, M+1)
+
+        ### C2Q ###
+        alpha = masked_softmax(L, L_mask, dim=2) # (bs, N+1, M+1)
+        a = torch.bmm(alpha,q_new) # (bs, N+1, hidden_size)
+
+        ### Q2C ###
+        beta = masked_softmax(L, L_mask, dim=1) # (bs, N+1, M+1)
+        beta_perm = beta.permute(0,2,1) # (bs, M+1, N+1)
+        b = torch.bmm(beta_perm,c_new) # (bs, M+1, hidden_size)
+
+        ### 2ND LEVEL ATTN ###
+        s_all = torch.bmm(alpha,b) # (bs, N+1, hidden_size)
+        s = s_all[:,:-1,:] # (bs, N, hidden_size)
+
+        ### ENCODED OUTPUT ###
+        a_cut = a[:, :N, :] # (bs, N, hidden_size)
+        encoder_input = torch.cat([s, a_cut], dim=2) # (bs, N, 2*hidden_size)
+
+        encoder_output,_ = self.lstmEncoder(encoder_input) # (bs, N, 4*hidden_size)
+        assert encoder_output.size() == (batch_size, N, 4*hidden_size)
+
+
+        return encoder_output
+
         """
-        print("q_len: ", q_len)
-        print("c.size(): ", c.size())
-        print("q.size(): ", q.size())
-        """
+        batch_size, c_len, _ = c.size()
+
+        q_len = q.size(1)
+
         s = self.get_similarity_matrix(c, q)        # (batch_size, c_len, q_len)
-        """
-        print("s.size() ", s.size())
-        print("c_mask.size() :", c_mask.size())
-        print("q_mask.size() :", q_mask.size())
-        """
+
         c_mask = c_mask.view(batch_size, c_len, 1)  # (batch_size, c_len, 1)
         q_mask = q_mask.view(batch_size, 1, q_len)  # (batch_size, 1, q_len)
         s1 = masked_softmax(s, q_mask, dim=2)       # (batch_size, c_len, q_len)
@@ -172,30 +253,7 @@ class DCNAttention(nn.Module):
         x = torch.cat([c, a, c * a, c * b], dim=2)  # (bs, c_len, 4 * hid_size)
 
         return x
-
-    def get_similarity_matrix(self, c, q):
-        """Get the "similarity matrix" between context and query (using the
-        terminology of the BiDAF paper).
-
-        A naive implementation as described in BiDAF would concatenate the
-        three vectors then project the result with a single weight matrix. This
-        method is a more memory-efficient implementation of the same operation.
-
-        See Also:
-            Equation 1 in https://arxiv.org/abs/1611.01603
         """
-        c_len, q_len = c.size(1), q.size(1)
-        c = F.dropout(c, self.drop_prob, self.training)  # (bs, c_len, hid_size)
-        q = F.dropout(q, self.drop_prob, self.training)  # (bs, q_len, hid_size)
-
-        # Shapes: (batch_size, c_len, q_len)
-        s0 = torch.matmul(c, self.c_weight).expand([-1, -1, q_len])
-        s1 = torch.matmul(q, self.q_weight).transpose(1, 2)\
-                                           .expand([-1, c_len, -1])
-        s2 = torch.matmul(c * self.cq_weight, q.transpose(1, 2))
-        s = s0 + s1 + s2 + self.bias
-
-        return s
 
 
 class BiDAFAttention(nn.Module):
