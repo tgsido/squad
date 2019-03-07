@@ -189,7 +189,7 @@ class DCNAttention(nn.Module):
         ### PROJECTED HIDDEN STATES ###
         q_inter = torch.cat([q, torch.zeros((batch_size, self.max_question_len - q_len, hidden_size), device=device)], dim=1) # (bs, max_question_len, hidden_size)
         #print("q_inter.size(): ", q_inter.size())
-        q_prime_full = torch.nn.functional.tanh(self.W_prime_layer(q_inter)) # (bs, max_question_len, hidden_size)
+        q_prime_full = torch.tanh(self.W_prime_layer(q_inter)) # (bs, max_question_len, hidden_size)
         #print("q_prime_full.size(): ", q_prime_full.size())
         q_prime = q_prime_full[:,:M,:] # (bs, M, hidden_size)
         #print("q_prime.size(): ", q_prime.size())
