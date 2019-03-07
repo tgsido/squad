@@ -27,6 +27,7 @@ from tensorboardX import SummaryWriter
 from tqdm import tqdm
 from ujson import load as json_load
 from util import collate_fn, SQuAD
+from generate_bert_embeddings import get_embeddings
 
 
 def main(args):
@@ -46,15 +47,15 @@ def main(args):
     if(args.model_type == "bidaf" or args.model_type == "bert-bidaf"):
         model = BiDAF(word_vectors=word_vectors,
                       hidden_size=args.hidden_size,
-                      drop_prob=args.drop_prob)
+                      drop_prob=0)
     elif(args.model_type == "dcn" or args.model_type == "dcn-bidaf"):
         model = DCN(word_vectors=word_vectors,
                       hidden_size=args.hidden_size,
-                      drop_prob=args.drop_prob)
+                      drop_prob=0)
     elif(args.model_type == "bert-basic"):
         model = BERT(word_vectors=word_vectors,
                       hidden_size=args.hidden_size,
-                      drop_prob=args.drop_prob)
+                      drop_prob=0)
     model = nn.DataParallel(model, gpu_ids)
     log.info('Loading checkpoint from {}...'.format(args.load_path))
     model = util.load_model(model, args.load_path, gpu_ids, return_step=False)
