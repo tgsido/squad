@@ -230,6 +230,8 @@ class DCNAttention(nn.Module):
         encoder_output,_ = self.lstmEncoder(encoder_input) # (bs, N, 4*hidden_size)
         assert encoder_output.size() == (batch_size, N, 4*hidden_size)
 
+        dropout_layer = torch.nn.Dropout(self.drop_prob)
+        encoder_output = dropout_layer(encoder_output)
 
         return encoder_output
 
