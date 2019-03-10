@@ -13,7 +13,7 @@ def main():
                         help="specify test or dev")
     args = parser.parse_args()
 
-    df = pd.read_json(args.input_file_name)
+    df = pd.read_json(args.input_file_name, index=[0])
     df.to_csv(args.output_dir + "/" + args.data_type + "_submission.csv" )
 
 if __name__ == "__main__":
