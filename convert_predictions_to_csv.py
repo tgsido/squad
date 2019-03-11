@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import argparse
 
 def main():
@@ -13,7 +14,12 @@ def main():
                         help="specify test or dev")
     args = parser.parse_args()
 
-    df = pd.read_json(args.input_file_name, index=[0])
+    ser = pd.read_json(args.input_file_name, typ="series")
+    df = ser.to_frame()
+    df = pd.DataFrame(
+        np.row_stack([df.columns, df.values]),
+        columns=['Id', 'Predicted']
+    )
     df.to_csv(args.output_dir + "/" + args.data_type + "_submission.csv" )
 
 if __name__ == "__main__":

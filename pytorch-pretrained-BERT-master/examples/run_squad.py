@@ -773,6 +773,11 @@ def main():
                         "bert-base-multilingual-cased, bert-base-chinese.")
     parser.add_argument("--output_dir", default=None, type=str, required=True,
                         help="The output directory where the model checkpoints and predictions will be written.")
+    ## Additions for switching output layer and attn_type
+    parser.add_argument("--attn_type", default=None, type=str, required=True,
+                        help="self, bidaf, dcn")
+    parser.add_argument("--output_layer_type", default=None, type=str, required=True,
+                        help="rnn-rnn, rnn-lstm, rnn-cnn")
 
     ## Other parameters
     parser.add_argument("--train_file", default=None, type=str, help="SQuAD json for training. E.g., train-v1.1.json")
@@ -893,8 +898,15 @@ def main():
             num_train_optimization_steps = num_train_optimization_steps // torch.distributed.get_world_size()
 
     # Prepare model
-    model = BertForQuestionAnswering.from_pretrained(args.bert_model,
+    model = BertForQuestionAnswering.from_pretrained(args.bert_model, ## changed to BFQAMod
                 cache_dir=os.path.join(str(PYTORCH_PRETRAINED_BERT_CACHE), 'distributed_{}'.format(args.local_rank)))
+
+    ## Additions for switching attn mechanism and output layer type
+    setattr(model, "attn_type", args.attn_type)
+    setattr(model, "output_layer_type", args.output_layer_type)
+    #model.set_attn_type(args.attn_type)
+    #model.set_output_layer_type(args.output_layer_type)
+    #model.init_bert_qa_model()
 
     if args.fp16:
         model.half()
@@ -1023,6 +1035,11 @@ def main():
         model.load_state_dict(torch.load(output_model_file))
     else:
         model = BertForQuestionAnswering.from_pretrained(args.bert_model)
+
+    ## Additions for switching attn mechanism and output layer type
+    """model.set_attn_type(args.attn_type)
+    model.set_output_layer_type(args.output_layer_type)
+    model.init_bert_qa_model() """
 
     model.to(device)
 
