@@ -768,6 +768,7 @@ class BertModelMod(BertPreTrainedModel):
         self.encoder = BertEncoder(config)
         self.pooler = BertPooler(config)
         self.apply(self.init_bert_weights)
+        logger.info("initializing")
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None, output_all_encoded_layers=True):
         if attention_mask is None:
@@ -791,7 +792,7 @@ class BertModelMod(BertPreTrainedModel):
         extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
 
         embedding_output = self.embeddings(input_ids, token_type_ids)
-        print("token_type_ids: ", token_type_ids)
+        logger.info("token_type_ids: ", token_type_ids)
         encoded_layers = self.encoder(embedding_output,
                                       extended_attention_mask,
                                       output_all_encoded_layers=output_all_encoded_layers)
@@ -1265,12 +1266,14 @@ class BertForQuestionAnswering(BertPreTrainedModel):
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None, start_positions=None, end_positions=None):
         if self.bert is None:
-            print("initializing bert model now...")
-            print("self.attn_type: ", self.attn_type)
-            print("self.output_layer_type: ", self.output_layer_type)
+            logger.info("initializing bert model now...")
+            logger.info("self.attn_type: ", self.attn_type)
+            logger.info("self.output_layer_type: ", self.output_layer_type)
             self.bert = BertModelMod(self.config,self.attn_type, self.output_layer_type)
         else:
-            print("bert model already initialized")
+            logger.info("bert model already initialized")
+            logger.info("attn_type: ", self.attn_type)
+            logger.info("output_layer_type: ", self.output_layer_type)
         # modified return to include c & q_hiddens
         sequence_output, _, context_hiddens, question_hiddens = self.bert(input_ids, token_type_ids, attention_mask, output_all_encoded_layers=False) # (batch_size, sequence_length, hidden_size)
         logits = self.qa_outputs(sequence_output)
