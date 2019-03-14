@@ -34,10 +34,11 @@ from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler,
 from torch.utils.data.distributed import DistributedSampler
 from tqdm import tqdm, trange
 
-from pytorch_pretrained_bert.file_utils import PYTORCH_PRETRAINED_BERT_CACHE
-from pytorch_pretrained_bert.modeling import BertForQuestionAnswering, BertConfig, WEIGHTS_NAME, CONFIG_NAME
-from pytorch_pretrained_bert.optimization import BertAdam, warmup_linear
-from pytorch_pretrained_bert.tokenization import (BasicTokenizer,
+sys.path.append('.')
+from file_utils import PYTORCH_PRETRAINED_BERT_CACHE
+from modeling import BertForQuestionAnswering, BertQA, BertConfig, WEIGHTS_NAME, CONFIG_NAME
+from optimization import BertAdam, warmup_linear
+from tokenization import (BasicTokenizer,
                                                   BertTokenizer,
                                                   whitespace_tokenize)
 
@@ -573,13 +574,13 @@ def write_predictions(all_examples, all_features, all_results, n_best_size,
                         text="",
                         start_logit=null_start_logit,
                         end_logit=null_end_logit))
-                
+
             # In very rare edge cases we could only have single null prediction.
             # So we just create a nonce prediction in this case to avoid failure.
             if len(nbest)==1:
                 nbest.insert(0,
                     _NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0))
-                
+
         # In very rare edge cases we could have no valid predictions. So we
         # just create a nonce prediction in this case to avoid failure.
         if not nbest:
@@ -773,6 +774,10 @@ def main():
                         "bert-base-multilingual-cased, bert-base-chinese.")
     parser.add_argument("--output_dir", default=None, type=str, required=True,
                         help="The output directory where the model checkpoints and predictions will be written.")
+    parser.add_argument("--attn_type", default=None, type=str, required=True,
+                        help="bidaf, dcn, self")
+    parser.add_argument("--output_layer_type", default=None, type=str, required=True,
+                        help="rnn-rnn, rnn-cnn, rnn-lstm")
 
     ## Other parameters
     parser.add_argument("--train_file", default=None, type=str, help="SQuAD json for training. E.g., train-v1.1.json")
@@ -893,8 +898,16 @@ def main():
             num_train_optimization_steps = num_train_optimization_steps // torch.distributed.get_world_size()
 
     # Prepare model
-    model = BertForQuestionAnswering.from_pretrained(args.bert_model,
+    additional_props = dict()
+    additional_props['attn_type'] = args.attn_type
+    additional_props['output_layer_type'] = args.output_layer_type
+    print("additional_props: ", additional_props)
+
+    model = BertForQuestionAnswering.from_pretrained(args.bert_model, prop_dict=additional_props,
                 cache_dir=os.path.join(str(PYTORCH_PRETRAINED_BERT_CACHE), 'distributed_{}'.format(args.local_rank)))
+
+    if hasattr(model, 'module'):
+        print("has module")
 
     if args.fp16:
         model.half()

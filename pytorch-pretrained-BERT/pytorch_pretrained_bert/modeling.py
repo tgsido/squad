@@ -27,12 +27,14 @@ import tarfile
 import tempfile
 import sys
 from io import open
-
+import pdb
 import torch
 from torch import nn
 from torch.nn import CrossEntropyLoss
 
-from .file_utils import cached_path
+from file_utils import cached_path
+from output_layer_modules import AnswerPointerOutput, RNNCNNOutput
+
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +142,9 @@ class BertConfig(object):
                  attention_probs_dropout_prob=0.1,
                  max_position_embeddings=512,
                  type_vocab_size=2,
-                 initializer_range=0.02):
+                 initializer_range=0.02,
+                 attn_type=None,
+                 output_layer_type=None):
         """Constructs BertConfig.
 
         Args:
@@ -512,8 +516,10 @@ class BertPreTrainedModel(nn.Module):
         if isinstance(module, nn.Linear) and module.bias is not None:
             module.bias.data.zero_()
 
+
+
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, state_dict=None, cache_dir=None,
+    def from_pretrained(cls, pretrained_model_name_or_path, prop_dict=None, state_dict=None, cache_dir=None,
                         from_tf=False, *inputs, **kwargs):
         """
         Instantiate a BertPreTrainedModel from a pre-trained model file or a pytorch state dict.
@@ -541,11 +547,24 @@ class BertPreTrainedModel(nn.Module):
             *inputs, **kwargs: additional input for the specific Bert class
                 (ex: num_labels for BertForSequenceClassification)
         """
+        def get_prop_dict(prop_list):
+            prop_dict = dict()
+            for prop_str in prop_list:
+                colon_index = prop_str.find(":")
+                prop_name = prop_str[:colon_index]
+                prop_value = prop_str[colon_index+1:]
+                prop_dict[prop_name] = prop_value
+            return prop_dict
+
+        print("pretrained_model_name_or_path: ", pretrained_model_name_or_path)
+
         if pretrained_model_name_or_path in PRETRAINED_MODEL_ARCHIVE_MAP:
+            print("found name in PRETRAINED_MODEL_ARCHIVE_MAP ")
             archive_file = PRETRAINED_MODEL_ARCHIVE_MAP[pretrained_model_name_or_path]
         else:
             archive_file = pretrained_model_name_or_path
         # redirect to the cache, if necessary
+        print("archive_file: ", archive_file)
         try:
             resolved_archive_file = cached_path(archive_file, cache_dir=cache_dir)
         except EnvironmentError:
@@ -576,7 +595,11 @@ class BertPreTrainedModel(nn.Module):
         # Load config
         config_file = os.path.join(serialization_dir, CONFIG_NAME)
         config = BertConfig.from_json_file(config_file)
-        logger.info("Model config {}".format(config))
+        if prop_dict is not None:
+            print("config before mod: ", config)
+            config.attn_type = prop_dict["attn_type"]
+            config.output_layer_type = prop_dict["output_layer_type"]
+            print("config after mod: ", config)
         # Instantiate model.
         model = cls(config, *inputs, **kwargs)
         if state_dict is None and not from_tf:
@@ -1169,6 +1192,106 @@ class BertForQuestionAnswering(BertPreTrainedModel):
     ```
     """
     def __init__(self, config):
+        super(BertForQuestionAnswering, self).__init__(config)
+        self.bert = BertModel(config)
+        self.config = config
+        # TODO check with Google if it's normal there is no dropout on the token classifier of SQuAD in the TF version
+        # self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.qa_outputs = nn.Linear(config.hidden_size, 2)
+        self.answer_pointer_output = AnswerPointerOutput(config.hidden_size, config.hidden_dropout_prob)
+        self.rnn_cnn_output = RNNCNNOutput(config.hidden_size)
+        self.apply(self.init_bert_weights)
+
+    def forward(self, input_ids, token_type_ids=None, attention_mask=None, start_positions=None, end_positions=None):
+        sequence_output, _ = self.bert(input_ids, token_type_ids, attention_mask,
+        output_all_encoded_layers=False) # (batch_size, sequence_length, hidden_size)
+
+        #print("output_layer_type: ", self.config.output_layer_type)
+        if self.config.output_layer_type == "answer-pointer":
+            logits = self.answer_pointer_output(sequence_output, attention_mask)
+        elif self.config.output_layer_type == "rnn-cnn":
+            logits = self.rnn_cnn_output(sequence_output)
+        elif self.config.output_layer_type == "linear":
+            logits = self.qa_outputs(sequence_output)
+        """
+        elif self.config.output_layer_type == "rnn-rnn":
+            logits = self.rnn_rnn_output(sequence_output)
+        elif self.config.output_layer_type == "rnn-lstm":
+            logits = self.rnn_lstm_output(sequence_output)
+        """
+
+
+        start_logits, end_logits = logits.split(1, dim=-1)
+        start_logits = start_logits.squeeze(-1)
+        end_logits = end_logits.squeeze(-1)
+
+        if start_positions is not None and end_positions is not None:
+            # If we are on multi-GPU, split add a dimension
+            if len(start_positions.size()) > 1:
+                start_positions = start_positions.squeeze(-1)
+            if len(end_positions.size()) > 1:
+                end_positions = end_positions.squeeze(-1)
+            # sometimes the start/end positions are outside our model inputs, we ignore these terms
+            ignored_index = start_logits.size(1)
+            start_positions.clamp_(0, ignored_index)
+            end_positions.clamp_(0, ignored_index)
+
+            loss_fct = CrossEntropyLoss(ignore_index=ignored_index)
+            start_loss = loss_fct(start_logits, start_positions)
+            end_loss = loss_fct(end_logits, end_positions)
+            total_loss = (start_loss + end_loss) / 2
+            return total_loss
+        else:
+            return start_logits, end_logits
+
+class BertQA(BertPreTrainedModel):
+    """BERT model for Question Answering (span extraction).
+    This module is composed of the BERT model with a linear layer on top of
+    the sequence output that computes start_logits and end_logits
+
+    Params:
+        `config`: a BertConfig class instance with the configuration to build a new model.
+
+    Inputs:
+        `input_ids`: a torch.LongTensor of shape [batch_size, sequence_length]
+            with the word token indices in the vocabulary(see the tokens preprocessing logic in the scripts
+            `extract_features.py`, `run_classifier.py` and `run_squad.py`)
+        `token_type_ids`: an optional torch.LongTensor of shape [batch_size, sequence_length] with the token
+            types indices selected in [0, 1]. Type 0 corresponds to a `sentence A` and type 1 corresponds to
+            a `sentence B` token (see BERT paper for more details).
+        `attention_mask`: an optional torch.LongTensor of shape [batch_size, sequence_length] with indices
+            selected in [0, 1]. It's a mask to be used if the input sequence length is smaller than the max
+            input sequence length in the current batch. It's the mask that we typically use for attention when
+            a batch has varying length sentences.
+        `start_positions`: position of the first token for the labeled span: torch.LongTensor of shape [batch_size].
+            Positions are clamped to the length of the sequence and position outside of the sequence are not taken
+            into account for computing the loss.
+        `end_positions`: position of the last token for the labeled span: torch.LongTensor of shape [batch_size].
+            Positions are clamped to the length of the sequence and position outside of the sequence are not taken
+            into account for computing the loss.
+
+    Outputs:
+        if `start_positions` and `end_positions` are not `None`:
+            Outputs the total_loss which is the sum of the CrossEntropy loss for the start and end token positions.
+        if `start_positions` or `end_positions` is `None`:
+            Outputs a tuple of start_logits, end_logits which are the logits respectively for the start and end
+            position tokens of shape [batch_size, sequence_length].
+
+    Example usage:
+    ```python
+    # Already been converted into WordPiece token ids
+    input_ids = torch.LongTensor([[31, 51, 99], [15, 5, 0]])
+    input_mask = torch.LongTensor([[1, 1, 1], [1, 1, 0]])
+    token_type_ids = torch.LongTensor([[0, 0, 1], [0, 1, 0]])
+
+    config = BertConfig(vocab_size_or_config_json_file=32000, hidden_size=768,
+        num_hidden_layers=12, num_attention_heads=12, intermediate_size=3072)
+
+    model = BertForQuestionAnswering(config)
+    start_logits, end_logits = model(input_ids, token_type_ids, input_mask)
+    ```
+    """
+    def __init__(self, config, my_prop):
         super(BertForQuestionAnswering, self).__init__(config)
         self.bert = BertModel(config)
         # TODO check with Google if it's normal there is no dropout on the token classifier of SQuAD in the TF version
