@@ -138,18 +138,22 @@ class DCN(nn.Module):
         q_mask = q_mask[:,:max_question_len]
         c_len, q_len = c_mask.sum(-1), q_mask.sum(-1)
 
-        bert_embeddings = torch.nn.functional.relu(self.proj_bert_down(bert_embeddings))
-        bert_c_emb = bert_embeddings[:,0:torch.max(c_len),:]
-        bert_q_emb = bert_embeddings[:,max_context_len: max_context_len + torch.max(q_len),:]
+        if bert_embeddings is not None:
+            bert_embeddings = torch.nn.functional.relu(self.proj_bert_down(bert_embeddings))
+            bert_c_emb = bert_embeddings[:,0:torch.max(c_len),:]
+            bert_q_emb = bert_embeddings[:,max_context_len: max_context_len + torch.max(q_len),:]
 
-        c_emb = self.emb(cw_idxs)[:,:max_context_len,:]         # (batch_size, c_len, 300)
-        q_emb = self.emb(qw_idxs)[:,:max_question_len,:]         # (batch_size, q_len, 300)
-        if(c_emb.size(1) > max_context_len or q_emb.size(1) > max_question_len):
-            print("c_emb.size() ", c_emb.size())
-            print("q_emb.size() ", q_emb.size())
+            c_emb = self.emb(cw_idxs)[:,:max_context_len,:]         # (batch_size, c_len, 300)
+            q_emb = self.emb(qw_idxs)[:,:max_question_len,:]         # (batch_size, q_len, 300)
+            if(c_emb.size(1) > max_context_len or q_emb.size(1) > max_question_len):
+                print("c_emb.size() ", c_emb.size())
+                print("q_emb.size() ", q_emb.size())
 
-        c_emb = c_emb  +  c_emb * bert_c_emb # (batch_size, c_len, 100/ hidden_size)
-        q_emb = q_emb + q_emb * bert_q_emb # (batch_size, q_len, 100/ hidden_size)
+            c_emb = c_emb  +  c_emb * bert_c_emb # (batch_size, c_len, 100/ hidden_size)
+            q_emb = q_emb + q_emb * bert_q_emb # (batch_size, q_len, 100/ hidden_size)
+        else:
+            c_emb = self.emb(cw_idxs)[:,:max_context_len,:]         # (batch_size, c_len, 300)
+            q_emb = self.emb(qw_idxs)[:,:max_question_len,:]         # (batch_size, q_len, 300)
 
         c_enc = self.enc(c_emb, c_len)    # (batch_size, c_len, 2 * hidden_size)
         q_enc = self.enc(q_emb, q_len)    # (batch_size, q_len, 2 * hidden_size)
