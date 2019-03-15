@@ -150,7 +150,7 @@ class InputFeatures(object):
         self.is_impossible = is_impossible
 
 
-def read_squad_examples(input_file, is_training, version_2_with_negative):
+def read_squad_examples(input_file, is_training, version_2_with_negative, evalDev=False):
     """Read a SQuAD json file into a list of SquadExample."""
     with open(input_file, "r", encoding='utf-8') as reader:
         input_data = json.load(reader)["data"]
@@ -188,7 +188,7 @@ def read_squad_examples(input_file, is_training, version_2_with_negative):
                 if is_training:
                     if version_2_with_negative:
                         is_impossible = qa["is_impossible"]
-                    if (len(qa["answers"]) != 1) and (not is_impossible):
+                    if (len(qa["answers"]) != 1) and (not is_impossible) and (not evalDev):
                         raise ValueError(
                             "For training, each question should have exactly 1 answer.")
                     if not is_impossible:
@@ -795,7 +795,8 @@ def evalDev(model, args):
 
     ## changed is_training = True
     eval_examples = read_squad_examples(
-        input_file=args.predict_file, is_training=True, version_2_with_negative=args.version_2_with_negative)
+        input_file=args.predict_file, is_training=True, version_2_with_negative=args.version_2_with_negative
+        evalDev=True)
     eval_features = convert_examples_to_features(
         examples=eval_examples,
         tokenizer=tokenizer,
