@@ -36,13 +36,12 @@ from tqdm import tqdm, trange
 from tensorboardX import SummaryWriter
 
 sys.path.append('.')
-from file_utils import PYTORCH_PRETRAINED_BERT_CACHE
+from pytorch_pretrained_bert.file_utils import PYTORCH_PRETRAINED_BERT_CACHE
 from modeling import BertForQuestionAnswering, BertQA, BertConfig, WEIGHTS_NAME, CONFIG_NAME
-from optimization import BertAdam, warmup_linear
-from tokenization import (BasicTokenizer,
+from pytorch_pretrained_bert.optimization import BertAdam, warmup_linear
+from pytorch_pretrained_bert.tokenization import (BasicTokenizer,
                                                   BertTokenizer,
                                                   whitespace_tokenize)
-
 if sys.version_info[0] == 2:
     import cPickle as pickle
 else:
@@ -806,11 +805,6 @@ def evalDev(model, args, tokenizer, device):
         is_training=True,
         evalDev=True)
 
-    logger.info("***** Running predictions *****")
-    logger.info("  Num orig examples = %d", len(eval_examples))
-    logger.info("  Num split examples = %d", len(eval_features))
-    logger.info("  Batch size = %d", args.predict_batch_size)
-
     all_input_ids = torch.tensor([f.input_ids for f in eval_features], dtype=torch.long)
     all_input_mask = torch.tensor([f.input_mask for f in eval_features], dtype=torch.long)
     all_segment_ids = torch.tensor([f.segment_ids for f in eval_features], dtype=torch.long)
@@ -839,8 +833,6 @@ def evalDev(model, args, tokenizer, device):
         with torch.no_grad():
             loss = model(input_ids, segment_ids, input_mask, start_positions, end_positions)
             nll_meter.update(loss.item(), args.predict_batch_size)
-        """if num_steps == 3:
-            break"""
 
     model.train()
     devLoss = nll_meter.avg
@@ -860,6 +852,10 @@ def main():
                         help="bidaf, dcn, self")
     parser.add_argument("--output_layer_type", default=None, type=str, required=True,
                         help="rnn-rnn, rnn-cnn, rnn-lstm")
+    parser.add_argument("--load_frozen_model", action='store_true', help="Whether to load frozen model")
+    parser.add_argument("--frozen_model_dir", default=None, type=str, required=True,
+                        help="The directory with frozen model and config")
+
 
     ## Other parameters
     parser.add_argument("--train_file", default=None, type=str, help="SQuAD json for training. E.g., train-v1.1.json")
@@ -990,9 +986,24 @@ def main():
     additional_props['attn_type'] = args.attn_type
     additional_props['output_layer_type'] = args.output_layer_type
     print("additional_props: ", additional_props)
+    if args.load_frozen_model is True:
+        frozen_model_file = os.path.join(args.frozen_model_dir, WEIGHTS_NAME)
+        frozen_config_file = os.path.join(args.frozen_model_dir, CONFIG_NAME)
 
-    model = BertForQuestionAnswering.from_pretrained(args.bert_model, prop_dict=additional_props,
-                cache_dir=os.path.join(str(PYTORCH_PRETRAINED_BERT_CACHE), 'distributed_{}'.format(args.local_rank)))
+        # Load a trained model and config that you have fine-tuned
+        config = BertConfig(frozen_config_file)
+        print("Frozen config before mod: ", config)
+        prop_dict = additional_props
+        config.attn_type = prop_dict["attn_type"]
+        config.output_layer_type = prop_dict["output_layer_type"]
+        print("Frozen config after mod: ", config)
+        model = BertForQuestionAnswering(config)
+        model.load_state_dict(torch.load(frozen_model_file))
+        # freeze all embeddings but train on top
+        model.bert.embeddings.requires_grad = False
+    else:
+        model = BertForQuestionAnswering.from_pretrained(args.bert_model, prop_dict=additional_props,
+                    cache_dir=os.path.join(str(PYTORCH_PRETRAINED_BERT_CACHE), 'distributed_{}'.format(args.local_rank)))
 
     if hasattr(model, 'module'):
         print("has module")
@@ -1116,7 +1127,7 @@ def main():
                     global_step += 1
 
                 ## tb records train & dev metrics ##
-                if num_steps % 3:
+                if num_steps % 5000 == 0:
                     devLoss = evalDev(model, args, tokenizer, device)
                     loss_val = devLoss
                     tbx.add_scalar('dev/NLL', loss_val, num_steps)
@@ -1149,20 +1160,13 @@ def main():
             doc_stride=args.doc_stride,
             max_query_length=args.max_query_length,
             is_training=False)
-
+        """
         logger.info("***** Running predictions *****")
         logger.info("  Num orig examples = %d", len(eval_examples))
         logger.info("  Num split examples = %d", len(eval_features))
         logger.info("  Batch size = %d", args.predict_batch_size)
         """
-        all_input_ids = torch.tensor([f.input_ids for f in train_features], dtype=torch.long)
-        all_input_mask = torch.tensor([f.input_mask for f in train_features], dtype=torch.long)
-        all_segment_ids = torch.tensor([f.segment_ids for f in train_features], dtype=torch.long)
-        all_start_positions = torch.tensor([f.start_position for f in train_features], dtype=torch.long)
-        all_end_positions = torch.tensor([f.end_position for f in train_features], dtype=torch.long)
-        train_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids,
-                                   all_start_positions, all_end_positions)
-        """
+
         all_input_ids = torch.tensor([f.input_ids for f in eval_features], dtype=torch.long)
         all_input_mask = torch.tensor([f.input_mask for f in eval_features], dtype=torch.long)
         all_segment_ids = torch.tensor([f.segment_ids for f in eval_features], dtype=torch.long)
