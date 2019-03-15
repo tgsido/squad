@@ -134,14 +134,11 @@ def main(args):
 
                 ## Additions for BERT ##
                 max_context_len, max_question_len = args.para_limit, args.ques_limit
-                #print("batch_size: ", batch_size)
-                bert_train_embeddings = get_embeddings("train", ids, args.para_limit, args.ques_limit)
-                """
-                bert_train_embeddings = torch.ones((len(ids.tolist()), \
-                 max_context_len + max_question_len, 768), device=device)
-                """
-                #print("bert_train_embeddings.size() ", bert_train_embeddings.size())
 
+                if "bert" in args.model_type:
+                    bert_train_embeddings = get_embeddings("train", ids, args.para_limit, args.ques_limit)
+                else:
+                    bert_train_embeddings = None
 
                 # Forward
                 log_p1, log_p2 = model(cw_idxs, qw_idxs, bert_train_embeddings, \
@@ -216,11 +213,12 @@ def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2, args)
             batch_size = cw_idxs.size(0)
 
             ## Additions for BERT ##
-            #print("batch_size: ", batch_size)
-            bert_dev_embeddings = get_embeddings("dev", ids, args.para_limit, args.ques_limit)
-            #print("bert_dev_embeddings.size() ", bert_dev_embeddings.size())
-
             max_context_len, max_question_len = args.para_limit, args.ques_limit
+            if "bert" in args.model_type:
+                bert_dev_embeddings = get_embeddings("dev", ids, args.para_limit, args.ques_limit)
+            else:
+                bert_dev_embeddings = None
+
 
             # Forward
             log_p1, log_p2 = model(cw_idxs, qw_idxs, bert_dev_embeddings, \
