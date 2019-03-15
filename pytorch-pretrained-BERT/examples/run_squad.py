@@ -791,7 +791,7 @@ def _compute_softmax(scores):
         probs.append(score / total_sum)
     return probs
 
-def evalDev(model, args, tokenizer):
+def evalDev(model, args, tokenizer, device):
 
     ## changed is_training = True
     eval_examples = read_squad_examples(
@@ -1117,7 +1117,7 @@ def main():
 
                 ## tb records train & dev metrics ##
                 if num_steps % 3:
-                    devLoss = evalDev(model, args, tokenizer)
+                    devLoss = evalDev(model, args, tokenizer, device)
                     loss_val = devLoss.item()
                     tbx.add_scalar('dev/NLL', loss_val, num_steps)
 
