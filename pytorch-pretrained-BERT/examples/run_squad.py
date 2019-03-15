@@ -795,7 +795,7 @@ def evalDev(model, args):
 
     ## changed is_training = True
     eval_examples = read_squad_examples(
-        input_file=args.predict_file, is_training=True, version_2_with_negative=args.version_2_with_negative
+        input_file=args.predict_file, is_training=True, version_2_with_negative=args.version_2_with_negative,
         evalDev=True)
     eval_features = convert_examples_to_features(
         examples=eval_examples,
