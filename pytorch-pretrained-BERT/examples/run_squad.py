@@ -1118,7 +1118,7 @@ def main():
                 ## tb records train & dev metrics ##
                 if num_steps % 3:
                     devLoss = evalDev(model, args, tokenizer, device)
-                    loss_val = devLoss.item()
+                    loss_val = devLoss
                     tbx.add_scalar('dev/NLL', loss_val, num_steps)
 
     if args.do_train:
