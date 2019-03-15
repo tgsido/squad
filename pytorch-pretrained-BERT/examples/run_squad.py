@@ -33,6 +33,7 @@ from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler,
                               TensorDataset)
 from torch.utils.data.distributed import DistributedSampler
 from tqdm import tqdm, trange
+from tensorboardX import SummaryWriter
 
 sys.path.append('.')
 from file_utils import PYTORCH_PRETRAINED_BERT_CACHE
@@ -52,6 +53,32 @@ logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s -   %(messa
                     level = logging.INFO)
 logger = logging.getLogger(__name__)
 
+class AverageMeter:
+    """Keep track of average values over time.
+
+    Adapted from:
+        > https://github.com/pytorch/examples/blob/master/imagenet/main.py
+    """
+    def __init__(self):
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def reset(self):
+        """Reset meter."""
+        self.__init__()
+
+    def update(self, val, num_samples=1):
+        """Update meter with new value `val`, the average of `num` samples.
+
+        Args:
+            val (float): Average value to update the meter with.
+            num_samples (int): Number of samples that were averaged to
+                produce `val`.
+        """
+        self.count += num_samples
+        self.sum += val * num_samples
+        self.avg = self.sum / self.count
 
 class SquadExample(object):
     """
@@ -764,6 +791,60 @@ def _compute_softmax(scores):
         probs.append(score / total_sum)
     return probs
 
+def evalDev(model):
+
+    ## changed is_training = True
+    eval_examples = read_squad_examples(
+        input_file=args.predict_file, is_training=True, version_2_with_negative=args.version_2_with_negative)
+    eval_features = convert_examples_to_features(
+        examples=eval_examples,
+        tokenizer=tokenizer,
+        max_seq_length=args.max_seq_length,
+        doc_stride=args.doc_stride,
+        max_query_length=args.max_query_length,
+        is_training=True)
+
+    logger.info("***** Running predictions *****")
+    logger.info("  Num orig examples = %d", len(eval_examples))
+    logger.info("  Num split examples = %d", len(eval_features))
+    logger.info("  Batch size = %d", args.predict_batch_size)
+
+    all_input_ids = torch.tensor([f.input_ids for f in eval_features], dtype=torch.long)
+    all_input_mask = torch.tensor([f.input_mask for f in eval_features], dtype=torch.long)
+    all_segment_ids = torch.tensor([f.segment_ids for f in eval_features], dtype=torch.long)
+    all_example_index = torch.arange(all_input_ids.size(0), dtype=torch.long)
+    all_start_positions = torch.tensor([f.start_position for f in eval_features], dtype=torch.long)
+    all_end_positions = torch.tensor([f.end_position for f in eval_features], dtype=torch.long)
+    eval_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_example_index,
+    all_start_positions, all_end_positions)
+
+    # Run prediction for full data
+    eval_sampler = SequentialSampler(eval_data)
+    eval_dataloader = DataLoader(eval_data, sampler=eval_sampler, batch_size=args.predict_batch_size)
+
+    model.eval()
+    logger.info("Start evaluating")
+    nll_meter = AverageMeter()
+    num_steps = 0
+    for input_ids, input_mask, segment_ids, example_indices, start_positions, end_positions in tqdm(eval_dataloader, desc="Evaluating"):
+        num_steps += 1
+        input_ids = input_ids.to(device)
+        input_mask = input_mask.to(device)
+        segment_ids = segment_ids.to(device)
+        start_positions = start_positions.to(device)
+        end_positions = end_positions.to(device)
+        batch_size = input_ids.size(0)
+        print("dev batch_size: ", batch_size)
+        with torch.no_grad():
+            loss = model(input_ids, segment_ids, input_mask, start_positions, end_positions)
+            nll_meter.update(loss.item(), args.predict_batch_size)
+        if num_steps == 3:
+            break
+
+    model.train()
+    devLoss = nll_meter.avg
+    return devLoss
+
 def main():
     parser = argparse.ArgumentParser()
 
@@ -897,6 +978,12 @@ def main():
         if args.local_rank != -1:
             num_train_optimization_steps = num_train_optimization_steps // torch.distributed.get_world_size()
 
+    ### INIT TB LOGGING ###
+    save_dir = args.output_dir + "/save/"
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    tbx = SummaryWriter(save_dir)
+
     # Prepare model
     additional_props = dict()
     additional_props['attn_type'] = args.attn_type
@@ -992,19 +1079,25 @@ def main():
             train_sampler = RandomSampler(train_data)
         else:
             train_sampler = DistributedSampler(train_data)
-        train_dataloader = DataLoader(train_data, sampler=train_sampler, batch_size=args.train_batch_size)
+        train_dataloader = DataLoader(train_data, sampler=train_sampler, batch_size=args.train_batch_size, shuffle=True)
 
+        num_steps = 0
         model.train()
         for _ in trange(int(args.num_train_epochs), desc="Epoch"):
             for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
+                num_steps += 1
                 if n_gpu == 1:
                     batch = tuple(t.to(device) for t in batch) # multi-gpu does scattering it-self
                 input_ids, input_mask, segment_ids, start_positions, end_positions = batch
-                loss = model(input_ids, segment_ids, input_mask, start_positions, end_positions)
+                _, _, loss = model(input_ids, segment_ids, input_mask, start_positions, end_positions)
                 if n_gpu > 1:
                     loss = loss.mean() # mean() to average on multi-gpu.
                 if args.gradient_accumulation_steps > 1:
                     loss = loss / args.gradient_accumulation_steps
+
+                ## tb records loss ##
+                loss_val = loss.item()
+                tbx.add_scalar('train/NLL', loss_val, num_steps)
 
                 if args.fp16:
                     optimizer.backward(loss)
@@ -1020,6 +1113,12 @@ def main():
                     optimizer.step()
                     optimizer.zero_grad()
                     global_step += 1
+
+                ## tb records train & dev metrics ##
+                if num_steps % 3:
+                    devLoss = evalDev(model)
+                    loss_val = devLoss.item()
+                    tbx.add_scalar('dev/NLL', loss_val, num_steps)
 
     if args.do_train:
         # Save a trained model and the associated configuration
@@ -1054,12 +1153,21 @@ def main():
         logger.info("  Num orig examples = %d", len(eval_examples))
         logger.info("  Num split examples = %d", len(eval_features))
         logger.info("  Batch size = %d", args.predict_batch_size)
-
+        """
+        all_input_ids = torch.tensor([f.input_ids for f in train_features], dtype=torch.long)
+        all_input_mask = torch.tensor([f.input_mask for f in train_features], dtype=torch.long)
+        all_segment_ids = torch.tensor([f.segment_ids for f in train_features], dtype=torch.long)
+        all_start_positions = torch.tensor([f.start_position for f in train_features], dtype=torch.long)
+        all_end_positions = torch.tensor([f.end_position for f in train_features], dtype=torch.long)
+        train_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids,
+                                   all_start_positions, all_end_positions)
+        """
         all_input_ids = torch.tensor([f.input_ids for f in eval_features], dtype=torch.long)
         all_input_mask = torch.tensor([f.input_mask for f in eval_features], dtype=torch.long)
         all_segment_ids = torch.tensor([f.segment_ids for f in eval_features], dtype=torch.long)
         all_example_index = torch.arange(all_input_ids.size(0), dtype=torch.long)
         eval_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_example_index)
+
         # Run prediction for full data
         eval_sampler = SequentialSampler(eval_data)
         eval_dataloader = DataLoader(eval_data, sampler=eval_sampler, batch_size=args.predict_batch_size)
