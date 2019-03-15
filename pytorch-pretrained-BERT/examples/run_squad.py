@@ -229,7 +229,7 @@ def read_squad_examples(input_file, is_training, version_2_with_negative, evalDe
 
 
 def convert_examples_to_features(examples, tokenizer, max_seq_length,
-                                 doc_stride, max_query_length, is_training):
+                                 doc_stride, max_query_length, is_training, evalDev=False):
     """Loads a data file into a list of `InputBatch`s."""
 
     unique_id = 1000000000
@@ -347,7 +347,7 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
             if is_training and example.is_impossible:
                 start_position = 0
                 end_position = 0
-            if example_index < 20:
+            if example_index < 20 and (not evalDev):
                 logger.info("*** Example ***")
                 logger.info("unique_id: %s" % (unique_id))
                 logger.info("example_index: %s" % (example_index))
@@ -803,7 +803,8 @@ def evalDev(model, args, tokenizer, device):
         max_seq_length=args.max_seq_length,
         doc_stride=args.doc_stride,
         max_query_length=args.max_query_length,
-        is_training=True)
+        is_training=True,
+        evalDev=True)
 
     logger.info("***** Running predictions *****")
     logger.info("  Num orig examples = %d", len(eval_examples))
@@ -835,12 +836,11 @@ def evalDev(model, args, tokenizer, device):
         start_positions = start_positions.to(device)
         end_positions = end_positions.to(device)
         batch_size = input_ids.size(0)
-        print("dev batch_size: ", batch_size)
         with torch.no_grad():
             loss = model(input_ids, segment_ids, input_mask, start_positions, end_positions)
             nll_meter.update(loss.item(), args.predict_batch_size)
-        if num_steps == 3:
-            break
+        """if num_steps == 3:
+            break"""
 
     model.train()
     devLoss = nll_meter.avg
