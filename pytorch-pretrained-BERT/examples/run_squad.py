@@ -998,7 +998,7 @@ def main():
         config.output_layer_type = prop_dict["output_layer_type"]
         print("Frozen config after mod: ", config)
         model = BertForQuestionAnswering(config)
-        model.load_state_dict(torch.load(frozen_model_file))
+        model.load_state_dict(torch.load(frozen_model_file),strict=False)
         # freeze all embeddings but train on top
         #model.bert.embeddings.requires_grad = False
     else:
