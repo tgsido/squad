@@ -1000,7 +1000,7 @@ def main():
         model = BertForQuestionAnswering(config)
         model.load_state_dict(torch.load(frozen_model_file))
         # freeze all embeddings but train on top
-        model.bert.embeddings.requires_grad = False
+        #model.bert.embeddings.requires_grad = False
     else:
         model = BertForQuestionAnswering.from_pretrained(args.bert_model, prop_dict=additional_props,
                     cache_dir=os.path.join(str(PYTORCH_PRETRAINED_BERT_CACHE), 'distributed_{}'.format(args.local_rank)))
