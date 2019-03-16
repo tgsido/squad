@@ -36,10 +36,10 @@ from tqdm import tqdm, trange
 from tensorboardX import SummaryWriter
 
 sys.path.append('.')
-from pytorch_pretrained_bert.file_utils import PYTORCH_PRETRAINED_BERT_CACHE
+from file_utils import PYTORCH_PRETRAINED_BERT_CACHE
 from modeling import BertForQuestionAnswering, BertQA, BertConfig, WEIGHTS_NAME, CONFIG_NAME
-from pytorch_pretrained_bert.optimization import BertAdam, warmup_linear
-from pytorch_pretrained_bert.tokenization import (BasicTokenizer,
+from optimization import BertAdam, warmup_linear
+from tokenization import (BasicTokenizer,
                                                   BertTokenizer,
                                                   whitespace_tokenize)
 if sys.version_info[0] == 2:
