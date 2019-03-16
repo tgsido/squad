@@ -987,6 +987,7 @@ def main():
     additional_props['output_layer_type'] = args.output_layer_type
     print("additional_props: ", additional_props)
     if args.load_frozen_model is True:
+        print("loading frozen model:")
         """
         frozen_model_file = os.path.join(args.frozen_model_dir, WEIGHTS_NAME)
         frozen_config_file = os.path.join(args.frozen_model_dir, CONFIG_NAME)
@@ -1004,6 +1005,7 @@ def main():
         #model.bert.embeddings.requires_grad = False
         """
         model = BertForQuestionAnswering.from_pretrained(args.frozen_model_dir, prop_dict=additional_props)
+        model.bert.embeddings.requires_grad = False
     else:
         model = BertForQuestionAnswering.from_pretrained(args.bert_model, prop_dict=additional_props,
                     cache_dir=os.path.join(str(PYTORCH_PRETRAINED_BERT_CACHE), 'distributed_{}'.format(args.local_rank)))
