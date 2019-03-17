@@ -92,7 +92,7 @@ class AnswerPointerGruOutput(nn.Module):
         """ Init Answer.
         @param hidden_size (int): dimensionality of final output embeddings
         """
-        super(AnswerPointerOutput, self).__init__()
+        super(AnswerPointerGruOutput, self).__init__()
         self.hidden_size = hidden_size
         self.drop_prob = drop_prob
 
