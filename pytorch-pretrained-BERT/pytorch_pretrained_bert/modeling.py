@@ -33,7 +33,7 @@ from torch import nn
 from torch.nn import CrossEntropyLoss
 
 from file_utils import cached_path
-from output_layer_modules import AnswerPointerOutput, RNNCNNOutput
+from output_layer_modules import AnswerPointerOutput, AnswerPointerGruOutput,RNNCNNOutput
 
 
 logger = logging.getLogger(__name__)
@@ -1199,6 +1199,7 @@ class BertForQuestionAnswering(BertPreTrainedModel):
         # self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.qa_outputs = nn.Linear(config.hidden_size, 2)
         self.answer_pointer_output = AnswerPointerOutput(config.hidden_size, config.hidden_dropout_prob)
+        self.answer_pointer_gru_output = AnswerPointerGruOutput(config.hidden_size, config.hidden_dropout_prob)
         self.rnn_cnn_output = RNNCNNOutput(config.hidden_size)
         self.apply(self.init_bert_weights)
 
@@ -1206,9 +1207,11 @@ class BertForQuestionAnswering(BertPreTrainedModel):
         sequence_output, _ = self.bert(input_ids, token_type_ids, attention_mask,
         output_all_encoded_layers=False) # (batch_size, sequence_length, hidden_size)
 
-        #print("output_layer_type: ", self.config.output_layer_type)
+        print("output_layer_type: ", self.config.output_layer_type)
         if self.config.output_layer_type == "answer-pointer":
             logits = self.answer_pointer_output(sequence_output, attention_mask)
+        elif self.config.output_layer_type == "answer-pointer-gru":
+            logits = self.answer_pointer_gru_output(sequence_output, attention_mask)
         elif self.config.output_layer_type == "rnn-cnn":
             logits = self.rnn_cnn_output(sequence_output)
         elif self.config.output_layer_type == "linear":

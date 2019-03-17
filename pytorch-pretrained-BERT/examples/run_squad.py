@@ -1100,9 +1100,11 @@ def main():
 
         num_steps = 0
         model.train()
-        for _ in trange(int(args.num_train_epochs), desc="Epoch"):
+        for epoch_num in trange(int(args.num_train_epochs), desc="Epoch"):
             for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
                 num_steps += 1
+                if num_steps == 10:
+                    break
                 if n_gpu == 1:
                     batch = tuple(t.to(device) for t in batch) # multi-gpu does scattering it-self
                 input_ids, input_mask, segment_ids, start_positions, end_positions = batch
@@ -1136,6 +1138,14 @@ def main():
                     devLoss = evalDev(model, args, tokenizer, device)
                     loss_val = devLoss
                     tbx.add_scalar('dev/NLL', loss_val, num_steps)
+            ## Save model at end of every epoch
+            print("Saving model at end of epoch...")
+            model_to_save = model.module if hasattr(model, 'module') else model  # Only save the model it-self
+            output_model_file = os.path.join(args.output_dir, str(epoch_num), WEIGHTS_NAME)
+            torch.save(model_to_save.state_dict(), output_model_file)
+            output_config_file = os.path.join(args.output_dir, str(epoch_num), CONFIG_NAME)
+            with open(output_config_file, 'w') as f:
+                f.write(model_to_save.config.to_json_string())
 
     if args.do_train:
         # Save a trained model and the associated configuration

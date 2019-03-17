@@ -85,6 +85,81 @@ class AnswerPointerOutput(nn.Module):
 
         return logits
 
+class AnswerPointerGruOutput(nn.Module):
+    """ AnswerPointerGruOutput:
+    """
+    def __init__(self, hidden_size, drop_prob):
+        """ Init Answer.
+        @param hidden_size (int): dimensionality of final output embeddings
+        """
+        super(AnswerPointerOutput, self).__init__()
+        self.hidden_size = hidden_size
+        self.drop_prob = drop_prob
+
+        ### Answer-Pointer GRU ###
+        self.gru = nn.GRU(
+            input_size = self.hidden_size,
+            hidden_size = self.hidden_size,
+            num_layers = 1,
+            nonlinearity = 'tanh',
+            bias = True,
+            batch_first = True,
+            bidirectional = False
+        )
+
+    def forward(self, sequence_output, attention_mask):
+        """ Forward pass of AnswerPointerGruOutput module.
+        @param sequence_output: tensor of floats, shape # (batch_size, sequence_length, hidden_size)
+        @returns logits: tensor of floats, shape # (batch_size, sequence_length, 2)
+        """
+        print("in ansr-ptr-gru:")
+        batch_size, seq_len, hidden_size = sequence_output.size()
+        simple_attn = SimpleAttn(hidden_size = hidden_size, drop_prob = self.drop_prob)
+
+        ### 1st GRU Pass ###
+        output, h_n = self.gru(sequence_output)
+
+        assert output.size() == (batch_size, seq_len, hidden_size)
+        h_n = h_n.view(batch_size, 1, hidden_size)
+        #pdb.set_trace()
+        assert h_n.size() == (batch_size, 1, hidden_size)
+
+        attn_logits, attn_dist, attn_output = simple_attn(sequence_output, attention_mask, h_n)
+        assert attn_logits.size() == (batch_size, 1, seq_len)
+        assert attn_dist.size() == (batch_size, 1, seq_len)
+        assert attn_output.size() == (batch_size, 1, hidden_size)
+
+        beta_s = attn_dist.squeeze(1)
+        assert beta_s.size() == (batch_size,seq_len)
+        a_s = attn_output.squeeze(1).unsqueeze(0)
+        assert a_s.size() == (1, batch_size, hidden_size)
+        start_logits = attn_logits.squeeze(1).unsqueeze(-1)
+        assert start_logits.size() == (batch_size, seq_len, 1)
+
+        ### 2nd GRU Pass ###
+        output, h_n = self.gru(sequence_output, a_s)
+
+        assert output.size() == (batch_size, seq_len, hidden_size)
+        h_n = h_n.view(batch_size, 1, hidden_size)
+        assert h_n.size() == (batch_size, 1, hidden_size)
+
+        attn_logits, attn_dist, attn_output = simple_attn(sequence_output, attention_mask, h_n)
+        assert attn_logits.size() == (batch_size, 1, seq_len)
+        assert attn_dist.size() == (batch_size, 1, seq_len)
+        assert attn_output.size() == (batch_size, 1, hidden_size)
+
+        beta_e = attn_dist.squeeze(1)
+        assert beta_e.size() == (batch_size,seq_len)
+        a_e = attn_output.squeeze(1)
+        assert a_e.size() == (batch_size, hidden_size)
+        end_logits = attn_logits.squeeze(1).unsqueeze(-1)
+        assert end_logits.size() == (batch_size, seq_len, 1)
+
+        logits = torch.cat([start_logits, end_logits], dim=-1) # (batch_size, sequence_length,2)
+        assert logits.size() == (batch_size, seq_len, 2)
+
+        return logits
+
 class RNNCNNOutput(nn.Module):
     """ AnswerPointerOutput:
         Module that uses two RNNs to convert
