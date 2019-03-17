@@ -89,14 +89,15 @@ def main(args):
             batch_size = cw_idxs.size(0)
 
             ## Additions for BERT ##
-            #print("batch_size: ", batch_size)
-            bert_dev_embeddings = get_embeddings(args.split, ids, args.para_limit, args.ques_limit)
-            #print("bert_dev_embeddings.size() ", bert_dev_embeddings.size())
-
             max_context_len, max_question_len = args.para_limit, args.ques_limit
 
+            if "bert" in args.model_type:
+                bert_embeddings = get_embeddings(args.split, ids, args.para_limit, args.ques_limit)
+            else:
+                bert_embeddings = None
+
             # Forward
-            log_p1, log_p2 = model(cw_idxs, qw_idxs, bert_dev_embeddings, \
+            log_p1, log_p2 = model(cw_idxs, qw_idxs, bert_embeddings, \
             max_context_len, max_question_len)
             y1, y2 = y1.to(device), y2.to(device)
             loss = F.nll_loss(log_p1, y1) + F.nll_loss(log_p2, y2)
