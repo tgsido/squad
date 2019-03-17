@@ -1214,6 +1214,10 @@ class BertForQuestionAnswering(BertPreTrainedModel):
             logits = self.answer_pointer_gru_output(sequence_output, attention_mask)
         elif self.config.output_layer_type == "rnn-cnn":
             logits = self.rnn_cnn_output(sequence_output)
+        elif self.config.output_layer_type == "linear-answer-pointer":
+            ansr_ptr_logits = self.answer_pointer_gru_output(sequence_output, attention_mask)
+            linear_logits = self.qa_outputs(sequence_output)
+            logits = ansr_ptr_logits + linear_logits
         elif self.config.output_layer_type == "linear":
             logits = self.qa_outputs(sequence_output)
         """
