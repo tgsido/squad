@@ -43,7 +43,9 @@ def main(args):
     word_vectors = util.torch_from_json(args.word_emb_file)
 
     # Get model
+    model = None
     log.info('Building model...')
+    max_context_len, max_question_len = args.para_limit, args.ques_limit
     if(args.model_type == "bidaf" or args.model_type == "bert-bidaf"):
         model = BiDAF(word_vectors=word_vectors,
                       hidden_size=args.hidden_size,
@@ -51,6 +53,8 @@ def main(args):
     elif(args.model_type == "dcn" or args.model_type == "dcn-bidaf"):
         model = DCN(word_vectors=word_vectors,
                       hidden_size=args.hidden_size,
+                      max_context_len=max_context_len,
+                      max_question_len=max_question_len,
                       drop_prob=0)
     elif(args.model_type == "bert-basic"):
         model = BERT(word_vectors=word_vectors,
