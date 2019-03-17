@@ -1103,7 +1103,7 @@ def main():
         for epoch_num in trange(int(args.num_train_epochs), desc="Epoch"):
             for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
                 num_steps += 1
-                if num_steps == 10:
+                if num_steps % 10:
                     break
                 if n_gpu == 1:
                     batch = tuple(t.to(device) for t in batch) # multi-gpu does scattering it-self
