@@ -1005,7 +1005,7 @@ def main():
         #model.bert.embeddings.requires_grad = False
         """
         model = BertForQuestionAnswering.from_pretrained(args.frozen_model_dir, prop_dict=additional_props)
-        model.bert.embeddings.requires_grad = False
+        #model.bert.embeddings.requires_grad = False
     else:
         model = BertForQuestionAnswering.from_pretrained(args.bert_model, prop_dict=additional_props,
                     cache_dir=os.path.join(str(PYTORCH_PRETRAINED_BERT_CACHE), 'distributed_{}'.format(args.local_rank)))
