@@ -1141,9 +1141,9 @@ def main():
             ## Save model at end of every epoch
             print("Saving model at end of epoch...")
             model_to_save = model.module if hasattr(model, 'module') else model  # Only save the model it-self
-            output_model_file = os.path.join(args.output_dir, str(epoch_num), WEIGHTS_NAME)
+            output_model_file = os.path.join(args.output_dir, str(epoch_num) + WEIGHTS_NAME)
             torch.save(model_to_save.state_dict(), output_model_file)
-            output_config_file = os.path.join(args.output_dir, str(epoch_num), CONFIG_NAME)
+            output_config_file = os.path.join(args.output_dir, str(epoch_num) + CONFIG_NAME)
             with open(output_config_file, 'w') as f:
                 f.write(model_to_save.config.to_json_string())
 
