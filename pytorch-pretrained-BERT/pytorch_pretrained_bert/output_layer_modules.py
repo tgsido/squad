@@ -111,7 +111,7 @@ class AnswerPointerGruOutput(nn.Module):
         @param sequence_output: tensor of floats, shape # (batch_size, sequence_length, hidden_size)
         @returns logits: tensor of floats, shape # (batch_size, sequence_length, 2)
         """
-        print("in ansr-ptr-gru:")
+        #print("in ansr-ptr-gru:")
         batch_size, seq_len, hidden_size = sequence_output.size()
         simple_attn = SimpleAttn(hidden_size = hidden_size, drop_prob = self.drop_prob)
 

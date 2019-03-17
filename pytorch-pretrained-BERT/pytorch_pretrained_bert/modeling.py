@@ -1207,7 +1207,7 @@ class BertForQuestionAnswering(BertPreTrainedModel):
         sequence_output, _ = self.bert(input_ids, token_type_ids, attention_mask,
         output_all_encoded_layers=False) # (batch_size, sequence_length, hidden_size)
 
-        print("output_layer_type: ", self.config.output_layer_type)
+        #print("output_layer_type: ", self.config.output_layer_type)
         if self.config.output_layer_type == "answer-pointer":
             logits = self.answer_pointer_output(sequence_output, attention_mask)
         elif self.config.output_layer_type == "answer-pointer-gru":
