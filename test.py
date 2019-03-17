@@ -102,7 +102,7 @@ def main(args):
 
             # Forward
             log_p1, log_p2 = model(cw_idxs, qw_idxs, bert_embeddings, \
-            max_context_len, max_question_len)
+            max_context_len, max_question_len,device)
             y1, y2 = y1.to(device), y2.to(device)
             loss = F.nll_loss(log_p1, y1) + F.nll_loss(log_p2, y2)
             nll_meter.update(loss.item(), batch_size)
