@@ -101,7 +101,6 @@ class AnswerPointerGruOutput(nn.Module):
             input_size = self.hidden_size,
             hidden_size = self.hidden_size,
             num_layers = 1,
-            nonlinearity = 'tanh',
             bias = True,
             batch_first = True,
             bidirectional = False
