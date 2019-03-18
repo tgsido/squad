@@ -963,7 +963,7 @@ def main():
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)
 
-    tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=args.do_lower_case)
+    tokenizer = BertTokenizer.from_pretrained("bert-base-cased", do_lower_case=args.do_lower_case)
 
     train_examples = None
     num_train_optimization_steps = None
